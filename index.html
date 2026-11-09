@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uma Compare</title>
+</head>
+<body>
+  <h1>Uma Compare</h1>
+  <p>Compare two teams on identical races against random opponents from a team pool. Each trial
+    draws a race seed, 2 opponent teams and a gate order, and races both teams under exactly those
+    conditions. A team file is <code>{ "id": ..., "members": [...] }</code> or an array of 3 runners
+    (examples in <code>teams/</code>).</p>
+
+  <p><label>Champions Meeting <select id="cm"></select></label></p>
+  <p><label>Opponent pool <select id="pool"></select></label></p>
+  <p><label>Team A <input type="file" id="teamA" accept=".json,application/json"></label></p>
+  <p><label>Team B <input type="file" id="teamB" accept=".json,application/json"></label></p>
+  <p><label>Trials <input type="number" id="trials" value="100" min="2" step="1"></label></p>
+  <p><label><input type="checkbox" id="compact" checked> Compact output</label></p>
+  <p><button id="run" disabled>Compare</button></p>
+
+  <pre id="output">Loading...</pre>
+
+  <script type="module">
+    import { RacePreset } from './globalsim/index.js';
+    import { CM_NAMES, Tally, cmFromNumber, drawTrials, loadTeam, report, teamLabel } from './compare.js';
+
+    const $ = (id) => document.getElementById(id);
+    const output = $('output');
+    const runButton = $('run');
+    const teams = { A: null, B: null };
+    const pools = new Map(); // file -> parsed pool
+    let lastRun = null; // kept so the compact toggle can re-render without re-running
+    let running = false;
+
+    // Champions Meetings, newest first.
+    for (let number = CM_NAMES.length; number >= 1; number--) {
+      const cm = cmFromNumber(number);
+      const preset = RacePreset.championsMeeting(cm);
+      $('cm').add(new Option(`CM${number}: ${preset.name} (${preset.date}), ${preset.course}`, String(number)));
+    }
+
+    const manifest = await (await fetch('./pools/index.json')).json();
+    for (const entry of manifest) $('pool').add(new Option(entry.label, entry.file));
+    // Picking a pool selects its meeting; the meeting can still be changed afterwards.
+    const syncCm = () => {
+      const entry = manifest.find((e) => e.file === $('pool').value);
+      if (entry?.cm) $('cm').value = String(entry.cm);
+    };
+    $('pool').addEventListener('change', syncCm);
+    syncCm();
+
+    async function loadPool(file) {
+      if (!pools.has(file)) {
+        const response = await fetch(`./pools/${file}`);
+        if (!response.ok) throw new Error(`Could not load pools/${file} (HTTP ${response.status})`);
+        pools.set(file, await response.json());
+      }
+      return pools.get(file);
+    }
+
+    function status() {
+      runButton.disabled = running || !teams.A || !teams.B;
+      if (lastRun || running) return;
+      output.textContent = ['A', 'B'].map((key) => teams[key]
+        ? `Team ${key}: ${teams[key].name}  (${teamLabel(teams[key].team)})`
+        : `Team ${key}: (no file)`).join('\n');
+    }
+
+    for (const key of ['A', 'B']) {
+      const input = $(`team${key}`);
+      input.addEventListener('change', async () => {
+        teams[key] = null;
+        lastRun = null;
+        const file = input.files[0];
+        if (file) {
+          const name = file.name.replace(/\.json$/i, '');
+          try {
+            teams[key] = { name, team: loadTeam(JSON.parse(await file.text()), name) };
+          } catch (error) {
+            input.value = '';
+            status();
+            output.textContent += `\n\nTeam ${key} (${file.name}): ${error.message}`;
+            return;
+          }
+        }
+        status();
+      });
+    }
+
+    $('compact').addEventListener('change', () => {
+      if (lastRun) output.textContent = report({ ...lastRun, compact: $('compact').checked });
+    });
+
+    /** Run the trials across Web Workers; results come back in trial order. */
+    async function runTrials(context, trials, onProgress) {
+      const size = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, trials.length));
+      const chunk = Math.max(1, Math.min(16, Math.ceil(trials.length / (size * 4))));
+      const results = new Array(trials.length);
+      let next = 0;
+      const workers = [];
+      const call = (worker, message) => new Promise((resolve, reject) => {
+        worker.onmessage = ({ data }) => data.type === 'error' ? reject(new Error(data.message)) : resolve(data);
+        worker.onerror = (event) => { event.preventDefault(); reject(new Error(event.message || 'Worker failed')); };
+        worker.postMessage(message);
+      });
+      try {
+        await Promise.all(Array.from({ length: size }, async () => {
+          const worker = new Worker(new URL('./compare-worker.js', import.meta.url), { type: 'module' });
+          workers.push(worker);
+          await call(worker, { type: 'init', context });
+          while (next < trials.length) {
+            const start = next;
+            next = Math.min(trials.length, next + chunk);
+            const { results: batch } = await call(worker, { type: 'run', trials: trials.slice(start, next) });
+            batch.forEach((result, i) => { results[start + i] = result; });
+            onProgress(batch);
+          }
+        }));
+      } finally {
+        for (const worker of workers) worker.terminate();
+      }
+      return results;
+    }
+
+    runButton.addEventListener('click', async () => {
+      const n = Number($('trials').value);
+      if (!Number.isInteger(n) || n < 2) {
+        output.textContent = 'Trials must be an integer of at least 2 (for a confidence interval).';
+        return;
+      }
+      running = true;
+      lastRun = null;
+      status();
+      const started = performance.now();
+      try {
+        const cm = cmFromNumber(Number($('cm').value));
+        const teamA = teams.A.team;
+        const teamB = teams.B.team;
+        const testedIds = new Set([teamA.id, teamB.id]);
+        const pool = (await loadPool($('pool').value)).filter((team) => !testedIds.has(team.id));
+        if (pool.length < 2) throw new Error('The team pool needs at least 2 opponent teams besides the tested teams');
+
+        const trials = drawTrials(n, pool.length);
+        let done = 0;
+        let winsA = 0;
+        let winsB = 0;
+        output.textContent = `Running 0/${n} trials...`;
+        const results = await runTrials({ cm, teamA, teamB, pool }, trials, (batch) => {
+          for (const [a, b] of batch) {
+            done++;
+            winsA += Math.min(...a.orders) === 0;
+            winsB += Math.min(...b.orders) === 0;
+          }
+          output.textContent = `Running ${done}/${n} trials...  A wins ${winsA}, B wins ${winsB}`;
+        });
+
+        const tallyA = new Tally(teamA, teams.A.name);
+        const tallyB = new Tally(teamB, teams.B.name);
+        for (const [a, b] of results) {
+          tallyA.add(a);
+          tallyB.add(b);
+        }
+        lastRun = { cm, n, poolSize: pool.length, tallyA, tallyB };
+        console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
+        output.textContent = report({ ...lastRun, compact: $('compact').checked });
+      } catch (error) {
+        output.textContent = `Error: ${error.message}`;
+      } finally {
+        running = false;
+        status();
+      }
+    });
+
+    status();
+  </script>
+</body>
+</html>
