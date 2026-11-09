@@ -100,7 +100,7 @@
                 <div class="col d-flex align-items-end gap-4 flex-wrap">
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" role="switch" id="compact" checked>
-                        <label class="form-check-label" for="compact">Compact output</label>
+                        <label class="form-check-label" for="compact">Collapse skill details</label>
                     </div>
                     <button class="btn btn-pink ms-auto px-4" id="run" disabled>Compare</button>
                 </div>
@@ -108,8 +108,7 @@
         </div>
     </section>
 
-    <div class="output-title">Results</div>
-    <pre class="uc-output" id="output">Loading...</pre>
+    <div class="uc-results" id="output" aria-live="polite">Loading...</div>
 </main>
 
 <footer class="uc-footer">
@@ -186,6 +185,7 @@
     } from './compare.js';
     import {Roster, canonicalJson, hashOf} from './roster.js';
     import {validateTeamMembers} from './team-rules.js';
+    import {renderResults} from './results.js';
     import {ICONS, createTeamPicker, memberChipsHtml, renameSavedTeam, teamDisplayName} from './team-picker.js';
     import {randomTeamName} from './team-names.js';
     import {createUmaPicker} from './uma-picker.js';
@@ -313,14 +313,7 @@
     function status() {
         runButton.disabled = running || !teams.every(isComplete);
         if (lastRun || running) return;
-        output.textContent = teams.map((entry, slot) => {
-            if (!entry) return `${slotLabel(slot)}: (none selected)`;
-            const name = entry.name ?? slotLabel(slot);
-            if (!isComplete(entry)) {
-                return `${slotLabel(slot)}: ${name}  (${entry.team.members.filter(Boolean).length}/${TEAM_SIZE} umas)`;
-            }
-            return `${slotLabel(slot)}: ${name}  (${teamLabel(entry.team)})`;
-        }).join('\n');
+        output.textContent = '';
     }
 
     // ---- Team boxes ----
@@ -667,7 +660,7 @@
     });
 
     $('compact').addEventListener('change', () => {
-        if (lastRun) output.textContent = report({...lastRun, compact: $('compact').checked});
+        if (lastRun) renderResults(output, {...lastRun, compact: $('compact').checked});
     });
 
     /** Run the trials across Web Workers; results come back in trial order. */
@@ -746,7 +739,7 @@
             for (const perTeam of results) perTeam.forEach((result, slot) => tallies[slot].add(result));
             lastRun = {race, n, poolSize: pool.length, tallies, labels: tallies.map((_, slot) => slotLabel(slot))};
             console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
-            output.textContent = report({...lastRun, compact: $('compact').checked});
+            renderResults(output, {...lastRun, compact: $('compact').checked});
         } catch (error) {
             output.textContent = `Error: ${error.message}`;
         } finally {

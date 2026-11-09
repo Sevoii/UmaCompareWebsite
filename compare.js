@@ -199,7 +199,7 @@ function stdev(values) {
 }
 
 /** (mean, half-width) of a normal-approximation confidence interval. */
-function meanCi(values) {
+export function meanCi(values) {
   if (values.length < 2) return [fmean(values), Infinity];
   return [fmean(values), Z * stdev(values) / Math.sqrt(values.length)];
 }
@@ -209,12 +209,12 @@ function meanCi(values) {
  * has zero width when every difference is equal (e.g. neither team ever wins), so the
  * half-width adds one +1 and one -1 pseudo-observation.
  */
-function pairedDifferenceCi(differences) {
+export function pairedDifferenceCi(differences) {
   return [fmean(differences), Z * stdev([...differences, 1, -1]) / Math.sqrt(differences.length)];
 }
 
 /** Wilson score interval for a proportion. */
-function wilsonCi(successes, n) {
+export function wilsonCi(successes, n) {
   const p = successes / n;
   const centre = (p + Z * Z / (2 * n)) / (1 + Z * Z / n);
   const half = Z * Math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / (1 + Z * Z / n);
