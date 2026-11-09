@@ -119,6 +119,42 @@ export function timeGaps(results) {
   return results.map((r) => r.finishTimeRaw - winnerTime);
 }
 
+/**
+ * Where runner `horse` was (metres from the start) at time `t`, interpolated between the replay
+ * frames around it (frames are 1/15 s apart; before the first frame the runner is between the
+ * start and its first recorded position).
+ */
+export function positionAt(replay, horse, t) {
+  if (!replay.count) return 0;
+  const [firstTime, first] = replay.frame(0);
+  if (t <= firstTime) return firstTime > 0 ? first[6 * horse] * Math.max(0, t) / firstTime : first[6 * horse];
+  const step = replay.count > 1 ? replay.frame(1)[0] - firstTime : 1 / 15;
+  let i = Math.min(replay.count - 1, Math.max(0, Math.floor((t - firstTime) / step)));
+  while (i > 0 && replay.frame(i)[0] > t) i--;
+  while (i + 1 < replay.count && replay.frame(i + 1)[0] <= t) i++;
+  const [t0, v0] = replay.frame(i);
+  if (i + 1 >= replay.count) return v0[6 * horse];
+  const [t1, v1] = replay.frame(i + 1);
+  return v0[6 * horse] + (v1[6 * horse] - v0[6 * horse]) * (t - t0) / (t1 - t0);
+}
+
+/**
+ * Per runner, every skill activation as [skillId, metres from the start, seconds], in the
+ * order they happened. Non-skill events (such as "kakari") are skipped.
+ */
+function skillActivations(replay, horses, courseDistance) {
+  const activations = Array.from({ length: horses }, () => []);
+  for (const event of replay.metadata.skillEvents) {
+    if (event.horseIndex >= horses) continue;
+    const skillId = event.skillId;
+    if (typeof skillId === 'string' && !/^\d+$/.test(skillId)) continue;
+    const position = Math.min(courseDistance, Math.max(0, positionAt(replay, event.horseIndex, event.t)));
+    activations[event.horseIndex].push([String(Math.trunc(Number(skillId))), position, event.t]);
+  }
+  for (const list of activations) list.sort((a, b) => a[2] - b[2]);
+  return activations;
+}
+
 /** Per runner, the skill IDs (as strings) that activated at least once. */
 function activatedSkills(metadata, horseCount) {
   const activated = Array.from({ length: horseCount }, () => new Set());
@@ -159,6 +195,8 @@ async function runTrial(raceConditions, tested, opponents, seed, gates) {
     distances: distancesFromTop(replay, race.course.distance).slice(0, TEAM_SIZE),
     times: timeGaps(results).slice(0, TEAM_SIZE),
     skills: skills.slice(0, TEAM_SIZE).map((set) => [...set]),
+    // [skillId, metres, seconds] per activation, for the tested team's runners
+    activations: skillActivations(replay, TEAM_SIZE, race.course.distance),
   };
 }
 
@@ -221,10 +259,23 @@ export function wilsonCi(successes, n) {
   return [centre - half, centre + half];
 }
 
+/** Width of the activation-position bins for a course: about 1/80 of it, in whole 10 m steps. */
+export const activationBinSize = (courseDistance) => Math.max(10, Math.ceil(courseDistance / 80 / 10) * 10);
+
 export class Tally {
-  constructor(team, name) {
+  /**
+   * `courseDistance` (metres) turns on activation-position tracking: for each runner and skill,
+   * `skillBins[k].get(id)` is { counts, firstCounts, firstWins, firstPlaces } per bin of
+   * `binSize` metres: every activation, the races where the skill *first* activated in that bin,
+   * how many of those the team won, and the sum of this runner's places in them.
+   */
+  constructor(team, name, { courseDistance = null } = {}) {
     this.team = team;
     this.name = name;
+    this.courseDistance = courseDistance;
+    this.binSize = courseDistance ? activationBinSize(courseDistance) : null;
+    this.binCount = courseDistance ? Math.ceil(courseDistance / this.binSize) : 0;
+    this.skillBins = Array.from({ length: TEAM_SIZE }, () => new Map());
     this.wins = []; // 1 if a team member finished 1st, per trial
     this.winCount = 0;
     this.places = Array.from({ length: TEAM_SIZE }, () => []); // 1 = 1st
@@ -233,7 +284,7 @@ export class Tally {
     this.skillProcs = Array.from({ length: TEAM_SIZE }, () => new Map()); // races each skill activated in
   }
 
-  add({ orders, distances, times, skills }) {
+  add({ orders, distances, times, skills, activations }) {
     const win = Math.min(...orders) === 0 ? 1 : 0;
     this.wins.push(win);
     this.winCount += win;
@@ -242,6 +293,24 @@ export class Tally {
       this.distances[k].push(distances[k]);
       this.times[k].push(times[k]);
       for (const id of skills[k]) this.skillProcs[k].set(id, (this.skillProcs[k].get(id) ?? 0) + 1);
+      if (!this.binCount || !activations) continue;
+      const seen = new Set();
+      for (const [id, metres] of activations[k]) {
+        let bins = this.skillBins[k].get(id);
+        if (!bins) {
+          const zeros = () => new Array(this.binCount).fill(0);
+          bins = { counts: zeros(), firstCounts: zeros(), firstWins: zeros(), firstPlaces: zeros() };
+          this.skillBins[k].set(id, bins);
+        }
+        const bin = Math.min(this.binCount - 1, Math.floor(metres / this.binSize));
+        bins.counts[bin]++;
+        if (!seen.has(id)) { // the first activation of this skill in this race
+          seen.add(id);
+          bins.firstCounts[bin]++;
+          bins.firstWins[bin] += win;
+          bins.firstPlaces[bin] += orders[k] + 1;
+        }
+      }
     }
   }
 }

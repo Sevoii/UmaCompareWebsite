@@ -1475,3 +1475,98 @@ button.uc-ed-skill-main:hover span {
   color: var(--uc-pink-light);
   font-size: 18px;
 }
+
+/* Saved Teams: "Import from hakuraku" link field. */
+.uc-hakuraku-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.uc-hakuraku-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.uc-hakuraku-status {
+  margin: 8px 0 0;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+/* A just-imported team flashes pink once. */
+@keyframes uc-flash {
+  from { box-shadow: 0 0 0 2px var(--uc-pink), 0 0 18px rgba(244, 114, 182, 0.5); }
+  to { box-shadow: 0 0 0 0 transparent; }
+}
+
+.uc-flash {
+  animation: uc-flash 1.6s ease-out;
+}
+
+/* ---- Per-uma skill activation positions (results) ----------------------------------------- */
+.uc-results {
+  position: relative; /* anchors the strip tooltip */
+}
+
+.uc-result-skills li:has(.uc-skill-strip) {
+  flex-wrap: wrap;
+  row-gap: 5px;
+}
+
+/* One strip per skill: bins along the course, brighter = activated there more often. */
+.uc-skill-strip {
+  flex: 0 0 100%;
+  height: 12px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.3);
+  cursor: crosshair;
+}
+
+/* Axis row: 0 m, Middle / Late / Spurt, course length, lined up with the strips. */
+.uc-result-skills li.uc-skill-axis {
+  position: relative;
+  display: block;
+  height: 20px;
+  padding: 0;
+  border-bottom: 0;
+  color: var(--uc-text-muted);
+  font-size: 10px;
+}
+
+.uc-skill-axis span {
+  position: absolute;
+  bottom: 2px;
+  white-space: nowrap;
+  transform: translateX(-1px);
+}
+
+.uc-skill-axis span:not(:first-child):not(.uc-skill-axis-end) {
+  padding-left: 3px;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.uc-skill-axis .uc-skill-axis-end {
+  right: 0;
+  transform: none;
+}
+
+.uc-strip-tip {
+  position: absolute;
+  z-index: 20;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid rgba(244, 114, 182, 0.5);
+  border-radius: 6px;
+  background: var(--uc-bg-1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  color: var(--uc-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.uc-strip-tip strong {
+  color: var(--uc-text-primary);
+}

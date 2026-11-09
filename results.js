@@ -13,6 +13,56 @@ const metric = (values, unit = '') => {
 // The pair of teams the comparison panel shows, per results container (kept across re-renders).
 const chosenPairs = new WeakMap();
 
+// ---- where skills activate (per uma), drawn like hakuraku's "Simulator activation positions" ----
+// Race phases as fractions of the course: Middle from 1/6, Late from 2/3, Spurt from 5/6.
+const PHASES = [['Middle', 1 / 6], ['Late', 2 / 3], ['Spurt', 5 / 6]];
+const STRIP_RGB = '244, 114, 182';
+
+/**
+ * CSS background for one skill's activation strip: a bin per column, stronger pink where the
+ * skill activated more often (sqrt scale, so rare spots still show), plus the phase lines.
+ */
+function stripBackground(counts) {
+  const max = Math.max(...counts, 1);
+  const n = counts.length;
+  const stops = [];
+  let start = 0;
+  for (let i = 1; i <= n; i++) {
+    if (i < n && counts[i] === counts[start]) continue; // merge equal neighbours into one stop
+    const count = counts[start];
+    const alpha = count ? 0.18 + 0.82 * Math.sqrt(count / max) : 0.05;
+    stops.push(`rgba(${STRIP_RGB}, ${alpha.toFixed(3)}) ${(100 * start / n).toFixed(3)}% ${(100 * i / n).toFixed(3)}%`);
+    start = i;
+  }
+  const lines = PHASES.map(([, f]) => {
+    const at = (100 * f).toFixed(3);
+    return `transparent calc(${at}% - 1px), rgba(255, 255, 255, 0.55) calc(${at}% - 1px) ${at}%, transparent ${at}%`;
+  }).join(', ');
+  return `linear-gradient(to right, ${lines}), linear-gradient(to right, ${stops.join(', ')})`;
+}
+
+/** The axis row above a uma's skill strips: 0 m, phase names, course length. */
+function axisHtml(courseDistance) {
+  return `<li class="uc-skill-axis" aria-hidden="true"><span style="left:0">0m</span>
+    ${PHASES.map(([name, f]) => `<span style="left:${(100 * f).toFixed(3)}%">${name}</span>`).join('')}
+    <span class="uc-skill-axis-end">${courseDistance}m</span></li>`;
+}
+
+/** Tooltip text for bin `bin` of a skill's strip. */
+function binDetail(tally, k, bins, bin) {
+  const start = bin * tally.binSize;
+  const end = Math.min(tally.courseDistance, start + tally.binSize);
+  const total = bins.counts.reduce((a, b) => a + b, 0);
+  const count = bins.counts[bin];
+  const lines = [`${start}–${end} m`, `${count.toLocaleString()} activation${count === 1 ? '' : 's'}${total ? ` (${pct(count / total)} of this skill's)` : ''}`];
+  const first = bins.firstCounts[bin];
+  if (first) {
+    lines.push(`First activated here in ${first.toLocaleString()} race${first === 1 ? '' : 's'}:`);
+    lines.push(`team won ${pct(bins.firstWins[bin] / first)}, this uma's average place ${(bins.firstPlaces[bin] / first).toFixed(2)}`);
+  }
+  return lines;
+}
+
 /** The win-rate difference panel for teams i and j. */
 function pairHtml(tallies, labels, i, j) {
   const a = tallies[i], b = tallies[j];
@@ -55,11 +105,16 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
           <div class="uc-result-runner-heading"><img src="${portraitUrl(m)}" alt="" onerror="this.style.visibility='hidden'"><div><h4>${esc(memberName(t.team, k))}</h4><span>${esc(strategyName(m.strategy))}</span></div></div>
           <div class="uc-result-metrics"><div><span>Average place</span>${metric(t.places[k])}</div><div><span>Behind winner</span>${metric(t.distances[k], ' m')}</div><div><span>Finish gap</span>${metric(t.times[k], ' s')}</div></div>
           <details class="uc-result-skills"${compact ? '' : ' open'}><summary>Skill activations <span>${(m.skills ?? []).length} skills</span></summary>
-            <ul>${(m.skills ?? []).map((s) => {
+            <ul>${t.binCount ? axisHtml(t.courseDistance) : ''}${(m.skills ?? []).map((s) => {
               const id = String(typeof s === 'object' ? s.skillId : s);
               const rate = (t.skillProcs[k].get(id) ?? 0) / n;
-              return `<li><img src="${skillIconUrl(id)}" alt=""><span>${esc(skillLabel(Number(id)))}${s.isUnique ? ` <small>Lv ${esc(s.level)}</small>` : ''}</span><strong>${pct(rate)}</strong></li>`;
-            }).join('')}</ul><small>Activation rate = races where the skill activated at least once.</small>
+              const bins = t.skillBins?.[k]?.get(id);
+              const strip = !t.binCount ? ''
+                : `<div class="uc-skill-strip" data-team="${i}" data-runner="${k}" data-skill="${esc(id)}" style="background-image:${stripBackground(bins?.counts ?? new Array(t.binCount).fill(0))}"
+                    role="img" aria-label="Where ${esc(skillLabel(Number(id)))} activated"></div>`;
+              return `<li><img src="${skillIconUrl(id)}" alt=""><span>${esc(skillLabel(Number(id)))}${s.isUnique ? ` <small>Lv ${esc(s.level)}</small>` : ''}</span><strong>${pct(rate)}</strong>${strip}</li>`;
+            }).join('')}</ul><small>Activation rate = races where the skill activated at least once.${t.binCount
+              ? ` The strip shows where on the course it activated (${t.binSize} m bins, brighter = more often); hover it for details.` : ''}</small>
           </details></section>`).join('')}</div></article>`;
     }).join('')}</div><div class="uc-result-pairs">${pairPanel}</div>`;
 
@@ -72,4 +127,25 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
     });
   }
   chosenPairs.set(container, [pairA, pairB]);
+
+  // Hovering an activation strip shows that bin's numbers in a small tooltip.
+  const tip = document.createElement('div');
+  tip.className = 'uc-strip-tip';
+  tip.hidden = true;
+  container.append(tip);
+  container.onmousemove = (event) => {
+    const strip = event.target.closest?.('.uc-skill-strip');
+    const tally = strip && tallies[Number(strip.dataset.team)];
+    const k = strip && Number(strip.dataset.runner);
+    const bins = tally?.skillBins?.[k]?.get(strip.dataset.skill);
+    if (!bins) { tip.hidden = true; return; }
+    const rect = strip.getBoundingClientRect();
+    const bin = Math.min(tally.binCount - 1, Math.max(0, Math.floor((event.clientX - rect.left) / rect.width * tally.binCount)));
+    tip.innerHTML = binDetail(tally, k, bins, bin).map((line, j) => (j ? esc(line) : `<strong>${esc(line)}</strong>`)).join('<br>');
+    tip.hidden = false;
+    const box = container.getBoundingClientRect();
+    tip.style.left = `${Math.min(event.clientX - box.left + 12, box.width - tip.offsetWidth - 4)}px`;
+    tip.style.top = `${event.clientY - box.top + 16}px`;
+  };
+  container.onmouseleave = () => { tip.hidden = true; };
 }

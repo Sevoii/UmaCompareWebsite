@@ -2,8 +2,9 @@
 // each card also has favorite / rename / delete icons. Search, import-from-file and close live
 // in the header. Uses the <dialog id="teamPicker"> in index.html.
 import { umaLabel } from './globalsim/index.js';
-import { strategyName } from './compare.js';
+import { loadTeam, strategyName } from './compare.js';
 import { teamFromFile } from './team-import.js';
+import { hakurakuTeamName, importHakurakuTeam } from './hakuraku-import.js';
 import { OUTFITS } from './outfits.js';
 
 // GitHub Octicons (MIT), 16px.
@@ -16,6 +17,7 @@ export const ICONS = {
   arrowSwitch: svg('M5.22 14.78a.75.75 0 0 0 1.06-1.06L4.56 12h8.69a.75.75 0 0 0 0-1.5H4.56l1.72-1.72a.75.75 0 0 0-1.06-1.06l-3 3a.75.75 0 0 0 0 1.06l3 3Zm5.56-6.5a.75.75 0 1 1-1.06-1.06l1.72-1.72H2.75a.75.75 0 0 1 0-1.5h8.69L9.72 2.28a.75.75 0 0 1 1.06-1.06l3 3a.75.75 0 0 1 0 1.06l-3 3Z'),
   // Bootstrap Icons "floppy" (MIT).
   save: svg('M11 2H9v3h2zM1.5 0h11.586a1.5 1.5 0 0 1 1.06.44l1.415 1.414A1.5 1.5 0 0 1 16 2.914V14.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14.5v-13A1.5 1.5 0 0 1 1.5 0M1 1.5v13a.5.5 0 0 0 .5.5H2v-4.5A1.5 1.5 0 0 1 3.5 9h9a1.5 1.5 0 0 1 1.5 1.5V15h.5a.5.5 0 0 0 .5-.5V2.914a.5.5 0 0 0-.146-.353l-1.415-1.415A.5.5 0 0 0 13.086 1H13v4.5A1.5 1.5 0 0 1 11.5 7h-7A1.5 1.5 0 0 1 3 5.5V1H1.5a.5.5 0 0 0-.5.5m3 4a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V1H4zM3 15h10v-4.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5z'),
+  copy: svg('M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25ZM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z'),
   arrowLeft: svg('M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z'),
   x: svg('M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z'),
 };
@@ -196,7 +198,7 @@ export function renameSavedTeam(roster, id, label, { onCancel, onError = console
  * Wire the modal. `onSelect(slot, teamId)` (slot = index of the team box) runs when a team is
  * picked; the modal then closes. Returns { open(slot) }.
  */
-export function createTeamPicker({ roster, onSelect }) {
+export function createTeamPicker({ roster, onSelect, preferCm = null }) {
   const $ = (id) => document.getElementById(id);
   const dialog = $('teamPicker');
   const list = $('teamPickerList');
@@ -255,7 +257,7 @@ export function createTeamPicker({ roster, onSelect }) {
     const noun = (n) => `${n} team${n === 1 ? '' : 's'}`;
     count.textContent = terms.length ? `${shown.length} of ${noun(all.length)}` : noun(all.length);
     if (!all.length) {
-      list.innerHTML = '<p class="uc-picker-empty">No saved teams yet. Use <strong>Import from file</strong> to add one.</p>';
+      list.innerHTML = '<p class="uc-picker-empty">No saved teams yet. Use <strong>Import from hakuraku</strong> or <strong>Import from file</strong> to add one.</p>';
     } else if (!shown.length) {
       list.innerHTML = '<p class="uc-picker-empty">No teams match your search.</p>';
     } else {
@@ -329,6 +331,49 @@ export function createTeamPicker({ roster, onSelect }) {
     showError(problems.length ? problems.join('\n') : null);
   });
 
+  // ---- Import from hakuraku: paste a hakuraku.moe UmaLogs team link ----
+  const hkForm = $('teamPickerHakuraku');
+  const hkLink = $('teamPickerHakurakuLink');
+  const hkStatus = $('teamPickerHakurakuStatus');
+  const showStatus = (message) => { hkStatus.textContent = message ?? ''; hkStatus.hidden = !message; };
+  const closeHakuraku = () => { hkForm.hidden = true; hkLink.value = ''; showStatus(null); };
+
+  $('teamPickerHakurakuOpen').addEventListener('click', () => {
+    showError(null);
+    hkForm.hidden = !hkForm.hidden;
+    if (!hkForm.hidden) hkLink.focus();
+    else closeHakuraku();
+  });
+  $('teamPickerHakurakuCancel').addEventListener('click', closeHakuraku);
+  hkForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = hkForm.querySelector('[type=submit]');
+    submit.disabled = true;
+    showError(null);
+    showStatus('Looking up the team on hakuraku…');
+    try {
+      const imported = await importHakurakuTeam(hkLink.value, { preferCm: preferCm?.() });
+      const name = hakurakuTeamName(imported);
+      const team = loadTeam({ id: imported.teamId, members: imported.members }, name); // validates every member
+      const id = await roster.importTeam(team, { name });
+      closeHakuraku();
+      const skipped = imported.skipped.flat();
+      if (skipped.length) showError(`Imported "${name}", but left out skills GlobalSim doesn't know: ${skipped.join(', ')}`);
+      // Bring the imported team into view and flash it.
+      search.value = '';
+      render();
+      const card = list.querySelector(`[data-id="${id}"]`);
+      card?.scrollIntoView({ block: 'nearest' });
+      card?.classList.add('uc-flash');
+      setTimeout(() => card?.classList.remove('uc-flash'), 1600);
+    } catch (error) {
+      showStatus(null);
+      showError(error.message);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   $('teamPickerClose').addEventListener('click', () => dialog.close());
   // A click on the dialog element itself (not its contents) is a click on the backdrop.
   dialog.addEventListener('click', (event) => {
@@ -346,6 +391,7 @@ export function createTeamPicker({ roster, onSelect }) {
       slot = slotIndex;
       search.value = '';
       showError(null);
+      closeHakuraku();
       render();
       dialog.showModal();
       search.focus();

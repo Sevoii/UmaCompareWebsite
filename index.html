@@ -121,6 +121,7 @@
     <header class="uc-modal-header">
         <h2 id="teamPickerTitle">Saved Teams</h2>
         <div class="uc-modal-header-actions">
+            <button type="button" class="btn btn-sm btn-outline-pink" id="teamPickerHakurakuOpen">Import from hakuraku</button>
             <button type="button" class="btn btn-sm btn-outline-pink" id="teamPickerImport">Import from file</button>
             <input type="file" id="teamPickerFile" accept=".json,application/json" multiple hidden>
             <button type="button" class="btn-close" id="teamPickerClose" aria-label="Close"></button>
@@ -132,6 +133,14 @@
                    aria-label="Search teams">
             <span class="uc-picker-count" id="teamPickerCount" aria-live="polite"></span>
         </div>
+        <!-- "Import from hakuraku": paste a hakuraku.moe UmaLogs team link. -->
+        <form class="uc-hakuraku-form" id="teamPickerHakuraku" hidden>
+            <input type="url" class="form-control form-control-sm" id="teamPickerHakurakuLink" required
+                   placeholder="https://hakuraku.moe/umalogs?tab=archetypes&amp;team=…" aria-label="hakuraku team link">
+            <button type="submit" class="btn btn-sm btn-pink">Import</button>
+            <button type="button" class="btn btn-sm btn-outline-light" id="teamPickerHakurakuCancel">Cancel</button>
+        </form>
+        <p class="uc-hakuraku-status" id="teamPickerHakurakuStatus" aria-live="polite" hidden></p>
         <p class="uc-modal-error" id="teamPickerError" role="alert" hidden></p>
     </div>
     <div class="uc-picker-list" id="teamPickerList"></div>
@@ -188,7 +197,7 @@
     import {Roster, canonicalJson, hashOf} from './roster.js';
     import {validateTeamMembers} from './team-rules.js';
     import {renderResults} from './results.js';
-    import {ICONS, createTeamPicker, memberChipsHtml, renameSavedTeam, teamDisplayName} from './team-picker.js';
+    import {ICONS, createTeamPicker, memberChipsHtml, teamDisplayName} from './team-picker.js';
     import {randomTeamName} from './team-names.js';
     import {createUmaPicker} from './uma-picker.js';
     import {createUmaEditor, newUmaDraft} from './uma-editor.js';
@@ -334,7 +343,13 @@
     /** A team can be saved once all 3 umas are chosen. */
     const isComplete = (entry) => entry?.team.members.length === TEAM_SIZE && entry.team.members.every(Boolean);
     /** Saved, but the umas in the box no longer match the saved version. */
-    const isModified = (entry) => Boolean(savedTeam(entry)) && entry.currentId !== entry.rosterId;
+    /** The umas in the box no longer match the saved team it's based on. */
+    const umasChanged = (entry) => Boolean(savedTeam(entry)) && entry.currentId !== entry.rosterId;
+    /** The box's name was edited and differs from its saved team's (names only change on save). */
+    const nameChanged = (entry) => Boolean(savedTeam(entry)) && Boolean(entry.nameEdited)
+        && entry.name !== teamDisplayName(savedTeam(entry));
+    /** Saved, but the box's umas or name no longer match the saved version. */
+    const isModified = (entry) => umasChanged(entry) || nameChanged(entry);
     /** Anything in the box that clearing or replacing it would lose. */
     const hasUnsavedChanges = (entry) =>
         Boolean(entry?.team.members.some(Boolean)) && (!savedTeam(entry) || isModified(entry));
@@ -364,7 +379,7 @@
         const label = document.createElement('span');
         label.className = 'uc-team-name';
         label.textContent = entry?.name ?? slotLabel(slot);
-        if (saved) {
+        if (entry) { // renaming only changes this box; the saved team gets the name on save
             label.classList.add('uc-renamable');
             Object.assign(label, {tabIndex: 0, title: `${label.textContent} (click to rename)`});
             label.dataset.action = 'rename';
@@ -386,6 +401,13 @@
             iconButton('save', ICONS.save,
                 !complete ? needsUmas : modified ? 'Save changes' : saved ? 'Saved' : 'Save team',
                 {disabled: !canSave}),
+            // Save as copy: the edited team as a new saved team; the original stays as it was.
+            iconButton('save-copy', ICONS.copy,
+                !complete ? needsUmas
+                    : umasChanged(entry) ? 'Save as copy (keeps the original saved team unchanged)'
+                    : saved ? 'Change an uma first: a copy needs different umas (a new name alone is saved with save)'
+                    : 'Save the team first',
+                {disabled: !(complete && umasChanged(entry))}),
             iconButton('delete', ICONS.trash, saved ? 'Delete saved team' : 'Not saved',
                 {disabled: !saved, extraClass: 'uc-delete'}),
             iconButton('swap', ICONS.arrowSwitch, entry ? 'Change team' : 'Select team'),
@@ -408,7 +430,7 @@
     /** Copy a saved team's name into the box, and its uma nicknames while the umas still match. */
     function syncFromRoster(entry) {
         const saved = roster.resolveTeam(entry.rosterId);
-        entry.name = entry.team.name = teamDisplayName(saved);
+        if (!entry.nameEdited) entry.name = entry.team.name = teamDisplayName(saved); // keep a local rename
         if (!isModified(entry)) entry.team.memberNames = saved.memberNames;
     }
 
@@ -432,26 +454,95 @@
     });
 
     /**
+     * Set a box's name. Only the box changes (it then has unsaved changes); the saved team takes
+     * the name when the box is saved. An empty name, or the saved team's own name, undoes it.
+     */
+    function setBoxName(slot, name) {
+        const entry = teams[slot];
+        const saved = savedTeam(entry);
+        const savedName = saved ? teamDisplayName(saved) : null;
+        if (!name || name === savedName) {
+            entry.nameEdited = false;
+            entry.name = entry.team.name = savedName ?? (name || null);
+        } else {
+            entry.nameEdited = true;
+            entry.name = entry.team.name = name;
+        }
+        renderBox(slot);
+        status();
+    }
+
+    /** Swap a box's name for a text box: Enter or leaving it keeps the name, Escape cancels. */
+    function editBoxName(slot, label) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control form-control-sm uc-rename-input';
+        input.value = teams[slot].name ?? '';
+        input.placeholder = 'Team name';
+        input.setAttribute('aria-label', 'Team name');
+        label.replaceWith(input);
+        input.focus();
+        input.select();
+        let done = false;
+        const finish = (keep) => {
+            if (done) return;
+            done = true;
+            if (input.isConnected) input.replaceWith(label);
+            if (keep) setBoxName(boxes.indexOf(label.closest('.uc-team')), input.value.trim());
+            else renderBox(boxes.indexOf(label.closest('.uc-team')));
+        };
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+            if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
+    }
+
+    /** "<name> (copy)", or "(copy 2)", ... if that's taken. */
+    function copyName(name) {
+        const taken = new Set(roster.teams().map((team) => team.name).filter(Boolean));
+        const base = name.replace(/ \(copy(?: \d+)?\)$/, '');
+        for (let n = 1; ; n++) {
+            const candidate = `${base} (copy${n > 1 ? ` ${n}` : ''})`;
+            if (!taken.has(candidate)) return candidate;
+        }
+    }
+
+    /**
      * Save the box's team and return its id. Its umas are added (or reused). A box based on a
      * saved team updates that team (keeping its name and favorite); otherwise a new team is saved,
      * keeping the box's name if it has one or getting a random canonical team name.
+     * With `asCopy`, the box's team is saved as a new team named "<name> (copy)" and the box
+     * switches to it; the saved team it was based on is left unchanged.
      */
-    async function saveSlot(slot) {
+    async function saveSlot(slot, {asCopy = false} = {}) {
         const entry = teams[slot];
         if (!isComplete(entry)) throw new Error(`A team needs ${TEAM_SIZE} umas before it can be saved`);
         const umaIds = [];
         for (const member of entry.team.members) umaIds.push(await roster.addUma(member));
         let id = await hashOf(umaIds);
         const base = savedTeam(entry);
-        if (base && base.id !== id) {
-            entry.currentId = id;
-            entry.rosterId = id; // so the onChange re-render already sees the saved version
-            id = await roster.updateTeam(base.id, umaIds);
+        const renamed = nameChanged(entry);
+        if (asCopy) {
+            if (!roster.team(id)) { // otherwise these exact umas are already a saved team: use that
+                entry.currentId = entry.rosterId = id;
+                // A box that was given its own name keeps it; otherwise "<name> (copy)".
+                const name = renamed ? entry.name : copyName(entry.name ?? teamDisplayName(base ?? {}));
+                await roster.addTeam(umaIds, {name});
+            }
+        } else if (base) {
+            if (base.id !== id) {
+                entry.currentId = id;
+                entry.rosterId = id; // so the onChange re-render already sees the saved version
+                id = await roster.updateTeam(base.id, umaIds);
+            }
+            if (renamed) roster.renameTeam(id, entry.name); // the box's new name goes in now
         } else if (!roster.team(id)) {
             const taken = new Set(roster.teams().map((team) => team.name).filter(Boolean));
             entry.currentId = entry.rosterId = id;
             await roster.addTeam(umaIds, {name: entry.name ?? randomTeamName(taken)});
         }
+        entry.nameEdited = false;
         entry.rosterId = entry.currentId = entry.team.id = id;
         syncFromRoster(entry);
         renderBox(slot);
@@ -461,6 +552,8 @@
 
     const picker = createTeamPicker({
         roster,
+        // Hakuraku import: try the snapshot of the selected meeting first ("cm22").
+        preferCm: () => ($('racePreset').value ? `cm${$('racePreset').value}` : null),
         onSelect(slot, id) {
             if (!confirmDiscard(slot)) return;
             const resolved = roster.resolveTeam(id);
@@ -631,6 +724,9 @@
                     case 'save':
                         await saveSlot(slot);
                         break;
+                    case 'save-copy':
+                        await saveSlot(slot, {asCopy: true});
+                        break;
                     case 'favorite': {
                         const saved = savedTeam(entry);
                         if (saved) roster.toggleFavoriteTeam(saved.id);
@@ -644,13 +740,8 @@
                         }
                         break;
                     }
-                    case 'rename':
-                        if (savedTeam(entry)) {
-                            renameSavedTeam(roster, entry.rosterId, target, {
-                                onCancel: () => renderBox(slot),
-                                onError: alert
-                            });
-                        }
+                    case 'rename': // edits this box's name; the saved team gets it on save
+                        if (entry) editBoxName(slot, target);
                         break;
                 }
             } catch (error) {
@@ -769,7 +860,9 @@
                     + wins.map((count, i) => `${slotLabel(slots[i])} wins ${count}`).join(', ');
             });
 
-            const tallies = slots.map((slot) => new Tally(teams[slot].team, teams[slot].name ?? slotLabel(slot)));
+            // courseDistance turns on the per-uma skill activation positions.
+            const courseDistance = Course.get(race.courseId).distance;
+            const tallies = slots.map((slot) => new Tally(teams[slot].team, teams[slot].name ?? slotLabel(slot), {courseDistance}));
             for (const perTeam of results) perTeam.forEach((result, i) => tallies[i].add(result));
             lastRun = {race, n, poolSize: pool.length, tallies, labels: slots.map(slotLabel)};
             console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
