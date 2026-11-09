@@ -1403,3 +1403,75 @@ button.uc-ed-skill-main:hover span {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* Results: the pick-two-teams comparison panel. */
+.uc-result-pair-pick {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 320px;
+}
+
+.uc-result-pair-selects {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.uc-result-pair-selects .form-select {
+  width: auto;
+  min-width: 180px;
+  max-width: 100%;
+}
+
+.uc-result-pair-selects > span {
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+.uc-result-pair-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
+
+.uc-result-pair-note {
+  margin: 0;
+  color: var(--uc-text-secondary);
+}
+
+/* "+ Add team" under the team boxes. */
+.uc-add-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 15px;
+  padding: 14px;
+  border: 1px dashed rgba(244, 114, 182, 0.45);
+  border-radius: var(--uc-radius);
+  background: rgba(244, 114, 182, 0.04);
+  color: var(--uc-text-primary);
+  font-weight: 600;
+  transition: border-color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-add-team:hover {
+  border-color: var(--uc-pink);
+  background: rgba(244, 114, 182, 0.1);
+}
+
+.uc-add-team span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(244, 114, 182, 0.18);
+  color: var(--uc-pink-light);
+  font-size: 18px;
+}

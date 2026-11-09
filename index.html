@@ -70,8 +70,9 @@
     <section class="card mb-4">
         <div class="card-body">
             <h2 class="uc-section-title">Teams</h2>
-            <!-- One box per team slot, stamped from #teamSlotTemplate (count: TEAM_SLOT_COUNT in the script). -->
+            <!-- One box per team, stamped from #teamSlotTemplate; "Add team" adds more. -->
             <div class="uc-teams" id="teamSlots"></div>
+            <button type="button" class="uc-add-team" id="addTeam"><span aria-hidden="true">+</span>Add team</button>
             <template id="teamSlotTemplate">
                 <article class="uc-team">
                     <header>
@@ -93,6 +94,7 @@
                     <label class="form-label" for="pool">Opponent pool</label>
                     <select class="form-select" id="pool"></select>
                 </div>
+                <div class="w-100 m-0"></div><!-- Trials / toggle / Compare start a new row -->
                 <div class="col-sm-4 col-md-2">
                     <label class="form-label" for="trials">Trials</label>
                     <input class="form-control" type="number" id="trials" value="1000" min="2" step="1">
@@ -195,12 +197,10 @@
     const output = $('output');
     const runButton = $('run');
 
-    // How many teams are compared side by side. Everything below (boxes, picker, trials,
-    // report) works for any count >= 1; 2 is the classic A-vs-B comparison.
-    const TEAM_SLOT_COUNT = 2;
-    // Per slot: null, or { name, rosterId, team: { id, members, memberNames } }. members has
+    // One entry per team box (the page starts with one; "Add team" adds more, ✕ removes one).
+    // Each is null, or { name, rosterId, team: { id, members, memberNames } }; members has
     // TEAM_SIZE entries, each runner JSON or null while that uma hasn't been picked yet.
-    const teams = Array(TEAM_SLOT_COUNT).fill(null);
+    const teams = [];
 
     const pools = new Map(); // file -> parsed pool
     let lastRun = null; // kept so the compact toggle can re-render without re-running
@@ -310,8 +310,13 @@
 
     const slotLabel = (slot) => `Team ${slot + 1}`;
 
+    /** The boxes that take part in a comparison: every box with at least one uma. */
+    const testedSlots = () => teams.map((entry, slot) => (entry?.team.members.some(Boolean) ? slot : -1)).filter((s) => s >= 0);
+
     function status() {
-        runButton.disabled = running || !teams.every(isComplete);
+        // Compare needs at least one team, and every box that has umas must have all 3.
+        const tested = testedSlots();
+        runButton.disabled = running || !tested.length || !tested.every((slot) => isComplete(teams[slot]));
         if (lastRun || running) return;
         output.textContent = '';
     }
@@ -322,12 +327,7 @@
     // the umas it holds right now would have as a saved team (null until all 3 are chosen). When
     // the two differ, the box has unsaved changes: it keeps its saved team's name and save lights up.
     const roster = Roster.load();
-    const boxes = Array.from({length: TEAM_SLOT_COUNT}, (_, slot) => {
-        const el = $('teamSlotTemplate').content.firstElementChild.cloneNode(true);
-        el.dataset.slot = String(slot);
-        $('teamSlots').append(el);
-        return el;
-    });
+    const boxes = []; // the team box elements, in the same order as `teams`
 
     /** The saved roster team a box is based on, or null if it has none (or it was deleted). */
     const savedTeam = (entry) => (entry?.rosterId ? roster.team(entry.rosterId) : null);
@@ -389,7 +389,9 @@
             iconButton('delete', ICONS.trash, saved ? 'Delete saved team' : 'Not saved',
                 {disabled: !saved, extraClass: 'uc-delete'}),
             iconButton('swap', ICONS.arrowSwitch, entry ? 'Change team' : 'Select team'),
-            entry ? iconButton('clear', ICONS.x, 'Clear team', {extraClass: 'uc-clear'}) : '',
+            // ✕ removes the box; the last box left is just cleared instead.
+            boxes.length > 1 ? iconButton('clear', ICONS.x, 'Remove team', {extraClass: 'uc-clear'})
+                : entry ? iconButton('clear', ICONS.x, 'Clear team', {extraClass: 'uc-clear'}) : '',
         ].join('');
 
         el.querySelector('.uc-team-slots').innerHTML = memberChipsHtml(
@@ -562,14 +564,36 @@
         setTeam(slot, entry.team.members.some(Boolean) || savedTeam(entry) ? entry : null);
     }
 
-    boxes.forEach((el, slot) => {
+    /** Remove a team box (or, if it's the only one, empty it). */
+    function removeBox(slot) {
+        if (!confirmDiscard(slot)) return;
+        if (boxes.length === 1) {
+            setTeam(slot, null);
+            return;
+        }
+        boxes[slot].remove();
+        boxes.splice(slot, 1);
+        teams.splice(slot, 1);
+        lastRun = null;
+        boxes.forEach((_, s) => renderBox(s)); // "Team N" labels shift
+        status();
+    }
+
+    /** Add an empty team box at the end, wired up like the others. */
+    function addBox() {
+        const el = $('teamSlotTemplate').content.firstElementChild.cloneNode(true);
+        $('teamSlots').append(el);
+        boxes.push(el);
+        teams.push(null);
+        const slotOf = () => boxes.indexOf(el); // positions change as boxes come and go
+
         // Right-clicking a filled uma chip removes that uma (instead of the browser's menu).
         el.addEventListener('contextmenu', async (event) => {
             const chip = event.target.closest('.uc-member-pickable[data-index]');
             if (!chip) return;
             event.preventDefault();
             try {
-                await clearUma(slot, Number(chip.dataset.index));
+                await clearUma(slotOf(), Number(chip.dataset.index));
             } catch (error) {
                 alert(error.message);
             }
@@ -578,6 +602,7 @@
         el.addEventListener('click', async (event) => {
             const target = event.target.closest('[data-action]');
             if (!target || target.disabled) return;
+            const slot = slotOf();
             const entry = teams[slot];
             try {
                 switch (target.dataset.action) {
@@ -600,8 +625,8 @@
                     case 'clear-uma': // the ✕ on a chip: empty just that slot
                         await clearUma(slot, Number(target.dataset.index));
                         break;
-                    case 'clear':
-                        if (confirmDiscard(slot)) setTeam(slot, null);
+                    case 'clear': // ✕: remove this box (asks about unsaved changes)
+                        removeBox(slot);
                         break;
                     case 'save':
                         await saveSlot(slot);
@@ -641,8 +666,16 @@
                 event.target.click();
             }
         });
-        renderBox(slot);
+        boxes.forEach((_, s) => renderBox(s)); // other boxes' ✕ now removes instead of clears
+        status();
+        return el;
+    }
+
+    $('addTeam').addEventListener('click', () => {
+        addBox();
+        boxes.at(-1).scrollIntoView({block: 'nearest', behavior: 'smooth'});
     });
+    addBox(); // the page starts with one team
 
     // Any roster change (rename, favorite, delete, here or in the modal) refreshes the boxes.
     roster.onChange(() => {
@@ -711,7 +744,8 @@
         const started = performance.now();
         try {
             const race = currentRace();
-            const tested = teams.map((entry) => entry.team);
+            const slots = testedSlots(); // boxes with umas, in page order
+            const tested = slots.map((slot) => teams[slot].team);
             tested.forEach((team) => validateTeamMembers(team.members));
             // Leave the tested teams out of the opponents, matched by id or by identical members.
             const testedIds = new Set(tested.map((team) => team.id));
@@ -732,12 +766,12 @@
                     });
                 }
                 output.textContent = `Running ${done}/${n} trials...  `
-                    + wins.map((count, slot) => `${slotLabel(slot)} wins ${count}`).join(', ');
+                    + wins.map((count, i) => `${slotLabel(slots[i])} wins ${count}`).join(', ');
             });
 
-            const tallies = teams.map((entry, slot) => new Tally(entry.team, entry.name ?? slotLabel(slot)));
-            for (const perTeam of results) perTeam.forEach((result, slot) => tallies[slot].add(result));
-            lastRun = {race, n, poolSize: pool.length, tallies, labels: tallies.map((_, slot) => slotLabel(slot))};
+            const tallies = slots.map((slot) => new Tally(teams[slot].team, teams[slot].name ?? slotLabel(slot)));
+            for (const perTeam of results) perTeam.forEach((result, i) => tallies[i].add(result));
+            lastRun = {race, n, poolSize: pool.length, tallies, labels: slots.map(slotLabel)};
             console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
             renderResults(output, {...lastRun, compact: $('compact').checked});
         } catch (error) {

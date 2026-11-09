@@ -313,17 +313,31 @@ function printCompact(out, name, tally, n) {
  * The comparison report for finished tallies: one per tested team, any number of teams.
  * `labels` heads each team's section; it defaults to Team 1, Team 2, ...
  */
-export function report({ race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact }) {
+/**
+ * Win-rate difference between two tested teams (a - b) with its confidence interval:
+ * { difference, low, high } as fractions. Every team races the same seeds, opponents and
+ * gates, so the comparison is paired per trial.
+ */
+export function winRateDifference(a, b) {
+  const [difference, half] = pairedDifferenceCi(a.wins.map((win, t) => win - b.wins[t]));
+  return { difference, low: difference - half, high: difference + half };
+}
+
+/**
+ * The comparison report: one section per tested team, then the win-rate difference of the
+ * `pair` of teams ([i, j] indices into `tallies`; defaults to the first two, none for one team).
+ */
+export function report({
+  race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact,
+  pair = tallies.length > 1 ? [0, 1] : null,
+}) {
   const out = ['', `${raceLabel(race)}: ${n} trials against ${poolSize} possible opponent teams (${LEVEL})`, ''];
   tallies.forEach((tally, i) => (compact ? printCompact : printFull)(out, labels[i], tally, n));
-  // Every team races the same seeds, opponents and gates, so compare each pair per trial.
-  for (let i = 0; i < tallies.length; i++) {
-    for (let j = i + 1; j < tallies.length; j++) {
-      const [a, b] = [tallies[i], tallies[j]];
-      const [difference, half] = pairedDifferenceCi(a.wins.map((win, t) => win - b.wins[t]));
-      out.push(`Team win % difference (${a.name} - ${b.name}): ${signedPercent(difference)}  `
-        + `(${LEVEL} ${signedPercent(difference - half)} to ${signedPercent(difference + half)})`);
-    }
+  if (pair && pair[0] !== pair[1] && tallies[pair[0]] && tallies[pair[1]]) {
+    const [a, b] = [tallies[pair[0]], tallies[pair[1]]];
+    const { difference, low, high } = winRateDifference(a, b);
+    out.push(`Team win % difference (${a.name} - ${b.name}): ${signedPercent(difference)}  `
+      + `(${LEVEL} ${signedPercent(low)} to ${signedPercent(high)})`);
   }
   return out.join('\n');
 }
