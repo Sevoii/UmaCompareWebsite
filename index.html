@@ -1,225 +1,761 @@
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Uma Compare</title>
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-        referrerpolicy="no-referrer"
-        crossorigin="anonymous">
-  <link rel="stylesheet" href="./style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Uma Compare</title>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+          referrerpolicy="no-referrer"
+          crossorigin="anonymous">
+    <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <nav class="navbar uc-nav" data-bs-theme="dark">
+<nav class="navbar uc-nav" data-bs-theme="dark">
     <div class="container">
-      <span class="navbar-brand">Uma Compare</span>
+        <span class="navbar-brand">Uma Compare</span>
     </div>
-  </nav>
+</nav>
 
-  <main class="container">
+<main class="container">
     <header class="page-header">
-      <h1>Team comparison</h1>
-      <p class="page-subtitle">Compare two teams on identical races against random opponents from a team pool.
-        Each trial draws a race seed, 2 opponent teams and a gate order, and races both teams under exactly
-        those conditions. A team file is <code>{ "id": ..., "members": [...] }</code> or an array of 3 runners.</p>
+        <h1>Team comparison</h1>
+        <p class="page-subtitle">This tool helps see how your Umamusume teams stack up against each other. Each team is
+            tested against opponents drawn from a representative pool of teams, so the result reflects how it performs
+            across the whole field.
+            <br>
+            Every trial picks a race seed, 2 opponent teams and a gate order, then runs each of your teams under
+            exactly those conditions, so any difference comes down to the teams themselves.
+        </p>
     </header>
 
+    <!-- Race conditions: a Champions Meeting preset, or any course and conditions (like umalator). -->
     <section class="card mb-4">
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label" for="cm">Champions Meeting</label>
-            <select class="form-select" id="cm"></select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="pool">Opponent pool</label>
-            <select class="form-select" id="pool"></select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="teamA">Team A</label>
-            <input class="form-control" type="file" id="teamA" accept=".json,application/json">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="teamB">Team B</label>
-            <input class="form-control" type="file" id="teamB" accept=".json,application/json">
-          </div>
-          <div class="col-sm-4 col-md-3">
-            <label class="form-label" for="trials">Trials</label>
-            <input class="form-control" type="number" id="trials" value="100" min="2" step="1">
-          </div>
-          <div class="col d-flex align-items-end gap-4 flex-wrap">
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" role="switch" id="compact" checked>
-              <label class="form-check-label" for="compact">Compact output</label>
+        <div class="card-body">
+            <h2 class="uc-section-title">Race</h2>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label" for="racePreset">Preset</label>
+                    <select class="form-select" id="racePreset"></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="raceTrack">Racecourse</label>
+                    <select class="form-select" id="raceTrack"></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="raceCourse">Course</label>
+                    <select class="form-select" id="raceCourse"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceGround">Ground</label>
+                    <select class="form-select" id="raceGround"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceWeather">Weather</label>
+                    <select class="form-select" id="raceWeather"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceSeason">Season</label>
+                    <select class="form-select" id="raceSeason"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceTime">Time of day</label>
+                    <select class="form-select" id="raceTime"></select>
+                </div>
             </div>
-            <button class="btn btn-pink ms-auto px-4" id="run" disabled>Compare</button>
-          </div>
         </div>
-      </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="uc-section-title">Teams</h2>
+            <!-- One box per team slot, stamped from #teamSlotTemplate (count: TEAM_SLOT_COUNT in the script). -->
+            <div class="uc-teams" id="teamSlots"></div>
+            <template id="teamSlotTemplate">
+                <article class="uc-team">
+                    <header>
+                        <span class="uc-team-name"></span>
+                        <div class="uc-team-actions"></div><!-- filled by renderBox -->
+                    </header>
+                    <ul class="uc-team-slots"></ul>
+                </article>
+            </template>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="uc-section-title">Comparison Settings</h2>
+
+            <div class="row g-3 align-items-end">
+                <div class="col-12">
+                    <label class="form-label" for="pool">Opponent pool</label>
+                    <select class="form-select" id="pool"></select>
+                </div>
+                <div class="col-sm-4 col-md-2">
+                    <label class="form-label" for="trials">Trials</label>
+                    <input class="form-control" type="number" id="trials" value="1000" min="2" step="1">
+                </div>
+                <div class="col d-flex align-items-end gap-4 flex-wrap">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="compact" checked>
+                        <label class="form-check-label" for="compact">Compact output</label>
+                    </div>
+                    <button class="btn btn-pink ms-auto px-4" id="run" disabled>Compare</button>
+                </div>
+            </div>
+        </div>
     </section>
 
     <div class="output-title">Results</div>
     <pre class="uc-output" id="output">Loading...</pre>
-  </main>
+</main>
 
-  <footer class="uc-footer">
+<footer class="uc-footer">
     <div class="container">Simulated with GlobalSim.</div>
-  </footer>
+</footer>
 
-  <script type="module">
-    import { RacePreset } from './globalsim/index.js';
-    import { CM_NAMES, Tally, cmFromNumber, drawTrials, loadTeam, report, teamLabel } from './compare.js';
+<dialog id="teamPicker" class="uc-modal" aria-labelledby="teamPickerTitle">
+    <header class="uc-modal-header">
+        <h2 id="teamPickerTitle">Saved Teams</h2>
+        <div class="uc-modal-header-actions">
+            <button type="button" class="btn btn-sm btn-outline-pink" id="teamPickerImport">Import from file</button>
+            <input type="file" id="teamPickerFile" accept=".json,application/json" multiple hidden>
+            <button type="button" class="btn-close" id="teamPickerClose" aria-label="Close"></button>
+        </div>
+    </header>
+    <div class="uc-modal-search">
+        <div class="uc-modal-search-row">
+            <input type="search" class="form-control" id="teamPickerSearch" placeholder="Search by team or uma name"
+                   aria-label="Search teams">
+            <span class="uc-picker-count" id="teamPickerCount" aria-live="polite"></span>
+        </div>
+        <p class="uc-modal-error" id="teamPickerError" role="alert" hidden></p>
+    </div>
+    <div class="uc-picker-list" id="teamPickerList"></div>
+</dialog>
+
+<!-- Uma editor; its contents are rendered by uma-editor.js. -->
+<dialog id="umaEditor" class="uc-modal uc-editor" aria-labelledby="umaEditorTitle"></dialog>
+
+<dialog id="umaPicker" class="uc-modal" aria-labelledby="umaPickerTitle">
+    <header class="uc-modal-header">
+        <div class="uc-modal-title">
+            <button type="button" class="uc-icon-button" id="umaPickerBack" title="Back to saved umas"
+                    aria-label="Back to saved umas" hidden></button>
+            <h2 id="umaPickerTitle">Saved Umas</h2>
+        </div>
+        <div class="uc-modal-header-actions">
+            <button type="button" class="btn btn-sm btn-pink" id="umaPickerNew">Create</button>
+            <button type="button" class="btn btn-sm btn-outline-pink" id="umaPickerImport">Import from file</button>
+            <input type="file" id="umaPickerFile" accept=".json,application/json" multiple hidden>
+            <button type="button" class="btn-close" id="umaPickerClose" aria-label="Close"></button>
+        </div>
+    </header>
+    <div class="uc-modal-search">
+        <div class="uc-modal-search-row">
+            <input type="search" class="form-control" id="umaPickerSearch"
+                   placeholder="Search by name, costume or strategy"
+                   aria-label="Search umas">
+            <span class="uc-picker-count" id="umaPickerCount" aria-live="polite"></span>
+        </div>
+        <!-- Filters; options are filled in by uma-picker.js. -->
+        <div class="uc-apt-filters">
+            <label>Surface <select class="form-select form-select-sm" id="umaFilterSurface"></select></label>
+            <label>Distance <select class="form-select form-select-sm" id="umaFilterDistance"></select></label>
+            <label>Style <select class="form-select form-select-sm" id="umaFilterStyle"></select></label>
+        </div>
+        <p class="uc-modal-error" id="umaPickerError" role="alert" hidden></p>
+    </div>
+    <div class="uc-picker-list" id="umaPickerList"></div>
+    <!-- Preview of one uma (shown instead of the list). -->
+    <div class="uc-ed-body uc-preview" id="umaPickerPreview" hidden></div>
+    <footer class="uc-ed-footer" id="umaPickerPreviewFooter" hidden>
+        <button type="button" class="btn btn-outline-light" id="umaPickerPreviewBack">Back</button>
+        <div class="uc-ed-footer-right">
+            <button type="button" class="btn btn-pink" id="umaPickerSelect">Confirm</button>
+        </div>
+    </footer>
+</dialog>
+
+<script type="module">
+    import {Course, Ground, RacePreset, Season, Time, Weather, trackLabel} from './globalsim/index.js';
+    import {
+        CM_NAMES, TEAM_SIZE, Tally, cmFromNumber, drawTrials, loadTeam, raceFromMeeting, report, teamLabel,
+    } from './compare.js';
+    import {Roster, canonicalJson, hashOf} from './roster.js';
+    import {validateTeamMembers} from './team-rules.js';
+    import {ICONS, createTeamPicker, memberChipsHtml, renameSavedTeam, teamDisplayName} from './team-picker.js';
+    import {randomTeamName} from './team-names.js';
+    import {createUmaPicker} from './uma-picker.js';
+    import {createUmaEditor, newUmaDraft} from './uma-editor.js';
 
     const $ = (id) => document.getElementById(id);
     const output = $('output');
     const runButton = $('run');
-    const teams = { A: null, B: null };
+
+    // How many teams are compared side by side. Everything below (boxes, picker, trials,
+    // report) works for any count >= 1; 2 is the classic A-vs-B comparison.
+    const TEAM_SLOT_COUNT = 2;
+    // Per slot: null, or { name, rosterId, team: { id, members, memberNames } }. members has
+    // TEAM_SIZE entries, each runner JSON or null while that uma hasn't been picked yet.
+    const teams = Array(TEAM_SLOT_COUNT).fill(null);
+
     const pools = new Map(); // file -> parsed pool
     let lastRun = null; // kept so the compact toggle can re-render without re-running
     let running = false;
 
-    // Champions Meetings, newest first.
-    for (let number = CM_NAMES.length; number >= 1; number--) {
-      const cm = cmFromNumber(number);
-      const preset = RacePreset.championsMeeting(cm);
-      $('cm').add(new Option(`CM${number}: ${preset.name} (${preset.date}), ${preset.course}`, String(number)));
+    // ---- Race conditions ----
+    // A preset (Champions Meeting) fills in the course and conditions; any of them can then be
+    // changed, which turns the preset into "Custom" (or into a meeting whose conditions match).
+    const MEETINGS = CM_NAMES.map((_, i) => CM_NAMES.length - i); // newest first
+    const meetingRace = new Map(MEETINGS.map((n) => [n, raceFromMeeting(cmFromNumber(n))]));
+    // Racecourses without a name aren't in Global (umalator leaves them out too).
+    const COURSES = Course.all().filter((c) => !/^Track \d+$/.test(trackLabel(c.track)));
+    const CONDITIONS = {raceGround: Ground, raceWeather: Weather, raceSeason: Season, raceTime: Time};
+
+    $('racePreset').add(new Option('Custom', ''));
+    for (const number of MEETINGS) {
+        const preset = RacePreset.championsMeeting(cmFromNumber(number));
+        $('racePreset').add(new Option(`CM${number}: ${preset.name} (${preset.date}), ${preset.course}`, String(number)));
     }
+    for (const track of [...new Set(COURSES.map((c) => c.track))]) $('raceTrack').add(new Option(trackLabel(track), String(track)));
+    for (const [id, values] of Object.entries(CONDITIONS)) {
+        for (const value of Object.values(values)) $(id).add(new Option(value, value));
+    }
+
+    /** Fill the Course list for a racecourse, keeping a course with the same surface and distance if there is one. */
+    function fillCourses(track, keep = null) {
+        const select = $('raceCourse');
+        select.innerHTML = '';
+        const prefix = `${trackLabel(track)} `;
+        const courses = COURSES.filter((c) => c.track === track)
+            .sort((a, b) => a.surface - b.surface || a.distance - b.distance || a.layout - b.layout);
+        for (const course of courses) select.add(new Option(String(course).replace(prefix, ''), String(course.id)));
+        const same = keep && courses.find((c) => c.surface === keep.surface && c.distance === keep.distance);
+        if (same) select.value = String(same.id);
+    }
+
+    /** The race conditions the controls describe (with the meeting's name if they are exactly a meeting's). */
+    function currentRace() {
+        const race = {
+            courseId: Number($('raceCourse').value), ground: $('raceGround').value, weather: $('raceWeather').value,
+            season: $('raceSeason').value, time: $('raceTime').value, preset: null,
+        };
+        const meeting = meetingRace.get(Number($('racePreset').value));
+        if (meeting && ['courseId', 'ground', 'weather', 'season', 'time'].every((k) => meeting[k] === race[k])) {
+            race.preset = meeting.preset;
+        }
+        return race;
+    }
+    const currentCourse = () => Course.get(Number($('raceCourse').value));
+
+    function applyRace(race) {
+        const course = Course.get(race.courseId);
+        $('raceTrack').value = String(course.track);
+        fillCourses(course.track);
+        $('raceCourse').value = String(course.id);
+        $('raceGround').value = race.ground;
+        $('raceWeather').value = race.weather;
+        $('raceSeason').value = race.season;
+        $('raceTime').value = race.time;
+    }
+
+    function selectMeeting(number) {
+        $('racePreset').value = String(number);
+        applyRace(meetingRace.get(number));
+        lastRun = null;
+    }
+
+    /** After a manual change: show the meeting these conditions match, or "Custom". */
+    function syncPreset() {
+        const race = currentRace();
+        const match = MEETINGS.find((n) => {
+            const m = meetingRace.get(n);
+            return ['courseId', 'ground', 'weather', 'season', 'time'].every((k) => m[k] === race[k]);
+        });
+        $('racePreset').value = match ? String(match) : '';
+        lastRun = null;
+    }
+
+    $('racePreset').addEventListener('change', () => {
+        if ($('racePreset').value) selectMeeting(Number($('racePreset').value));
+    });
+    $('raceTrack').addEventListener('change', () => {
+        fillCourses(Number($('raceTrack').value), currentCourse());
+        syncPreset();
+    });
+    for (const id of ['raceCourse', ...Object.keys(CONDITIONS)]) $(id).addEventListener('change', syncPreset);
+    selectMeeting(MEETINGS[0]);
 
     const manifest = await (await fetch('./pools/index.json')).json();
     for (const entry of manifest) $('pool').add(new Option(entry.label, entry.file));
-    // Picking a pool selects its meeting; the meeting can still be changed afterwards.
-    const syncCm = () => {
-      const entry = manifest.find((e) => e.file === $('pool').value);
-      if (entry?.cm) $('cm').value = String(entry.cm);
+    // Picking a pool selects its meeting; the race can still be changed afterwards.
+    const syncPoolMeeting = () => {
+        const entry = manifest.find((e) => e.file === $('pool').value);
+        if (entry?.cm) selectMeeting(entry.cm);
     };
-    $('pool').addEventListener('change', syncCm);
-    syncCm();
+    $('pool').addEventListener('change', syncPoolMeeting);
+    syncPoolMeeting();
 
     async function loadPool(file) {
-      if (!pools.has(file)) {
-        const response = await fetch(`./pools/${file}`);
-        if (!response.ok) throw new Error(`Could not load pools/${file} (HTTP ${response.status})`);
-        pools.set(file, await response.json());
-      }
-      return pools.get(file);
+        if (!pools.has(file)) {
+            const response = await fetch(`./pools/${file}`);
+            if (!response.ok) throw new Error(`Could not load pools/${file} (HTTP ${response.status})`);
+            pools.set(file, await response.json());
+        }
+        return pools.get(file);
     }
+
+    const slotLabel = (slot) => `Team ${slot + 1}`;
 
     function status() {
-      runButton.disabled = running || !teams.A || !teams.B;
-      if (lastRun || running) return;
-      output.textContent = ['A', 'B'].map((key) => teams[key]
-        ? `Team ${key}: ${teams[key].name}  (${teamLabel(teams[key].team)})`
-        : `Team ${key}: (no file)`).join('\n');
+        runButton.disabled = running || !teams.every(isComplete);
+        if (lastRun || running) return;
+        output.textContent = teams.map((entry, slot) => {
+            if (!entry) return `${slotLabel(slot)}: (none selected)`;
+            const name = entry.name ?? slotLabel(slot);
+            if (!isComplete(entry)) {
+                return `${slotLabel(slot)}: ${name}  (${entry.team.members.filter(Boolean).length}/${TEAM_SIZE} umas)`;
+            }
+            return `${slotLabel(slot)}: ${name}  (${teamLabel(entry.team)})`;
+        }).join('\n');
     }
 
-    for (const key of ['A', 'B']) {
-      const input = $(`team${key}`);
-      input.addEventListener('change', async () => {
-        teams[key] = null;
-        lastRun = null;
-        const file = input.files[0];
-        if (file) {
-          const name = file.name.replace(/\.json$/i, '');
-          try {
-            teams[key] = { name, team: loadTeam(JSON.parse(await file.text()), name) };
-          } catch (error) {
-            input.value = '';
-            status();
-            output.textContent += `\n\nTeam ${key} (${file.name}): ${error.message}`;
-            return;
-          }
-        }
-        status();
-      });
+    // ---- Team boxes ----
+    // A box holds a working copy of a team: { name, rosterId, currentId, team: { id, members,
+    // memberNames } }. rosterId is the saved team it's based on (null if none); currentId is the id
+    // the umas it holds right now would have as a saved team (null until all 3 are chosen). When
+    // the two differ, the box has unsaved changes: it keeps its saved team's name and save lights up.
+    const roster = Roster.load();
+    const boxes = Array.from({length: TEAM_SLOT_COUNT}, (_, slot) => {
+        const el = $('teamSlotTemplate').content.firstElementChild.cloneNode(true);
+        el.dataset.slot = String(slot);
+        $('teamSlots').append(el);
+        return el;
+    });
+
+    /** The saved roster team a box is based on, or null if it has none (or it was deleted). */
+    const savedTeam = (entry) => (entry?.rosterId ? roster.team(entry.rosterId) : null);
+    /** A team can be saved once all 3 umas are chosen. */
+    const isComplete = (entry) => entry?.team.members.length === TEAM_SIZE && entry.team.members.every(Boolean);
+    /** Saved, but the umas in the box no longer match the saved version. */
+    const isModified = (entry) => Boolean(savedTeam(entry)) && entry.currentId !== entry.rosterId;
+    /** Anything in the box that clearing or replacing it would lose. */
+    const hasUnsavedChanges = (entry) =>
+        Boolean(entry?.team.members.some(Boolean)) && (!savedTeam(entry) || isModified(entry));
+
+    /** Ask before throwing away a box's unsaved changes. */
+    function confirmDiscard(slot) {
+        const entry = teams[slot];
+        if (!hasUnsavedChanges(entry)) return true;
+        const name = entry.name ?? slotLabel(slot);
+        return confirm(`"${name}" has unsaved changes. Discard them?`);
     }
+
+    const iconButton = (action, icon, label, {disabled = false, pressed, extraClass = ''} = {}) =>
+        `<button type="button" class="uc-icon-button ${extraClass}" data-action="${action}" title="${label}" aria-label="${label}"`
+        + `${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}${disabled ? ' disabled' : ''}>${icon}</button>`;
+
+    function renderBox(slot) {
+        const el = boxes[slot];
+        const entry = teams[slot];
+        const saved = savedTeam(entry);
+        const complete = isComplete(entry);
+        const modified = isModified(entry);
+        const needsUmas = `Select ${TEAM_SIZE} umas to save`;
+
+        // Name: renamable (click) while the box is based on a saved team; a dot marks unsaved changes.
+        const name = el.querySelector('.uc-team-name, .uc-rename-input');
+        const label = document.createElement('span');
+        label.className = 'uc-team-name';
+        label.textContent = entry?.name ?? slotLabel(slot);
+        if (saved) {
+            label.classList.add('uc-renamable');
+            Object.assign(label, {tabIndex: 0, title: `${label.textContent} (click to rename)`});
+            label.dataset.action = 'rename';
+            label.setAttribute('role', 'button');
+        }
+        name.replaceWith(label);
+        el.querySelector('.uc-unsaved-dot')?.remove();
+        if (hasUnsavedChanges(entry) && (saved || entry.name)) {
+            label.insertAdjacentHTML('afterend', '<span class="uc-unsaved-dot" title="Unsaved changes" aria-label="Unsaved changes"></span>');
+        }
+
+        // Star, save and trash are always there; each is greyed out while it can't be used.
+        const favorite = Boolean(saved?.favorite);
+        const canSave = complete && (!saved || modified);
+        el.querySelector('.uc-team-actions').innerHTML = [
+            iconButton('favorite', ICONS.starOutline + ICONS.starFill,
+                saved ? (favorite ? 'Unfavorite' : 'Favorite') : complete ? 'Save and favorite' : needsUmas,
+                {disabled: !saved && !complete, pressed: favorite, extraClass: 'uc-star'}),
+            iconButton('save', ICONS.save,
+                !complete ? needsUmas : modified ? 'Save changes' : saved ? 'Saved' : 'Save team',
+                {disabled: !canSave}),
+            iconButton('delete', ICONS.trash, saved ? 'Delete saved team' : 'Not saved',
+                {disabled: !saved, extraClass: 'uc-delete'}),
+            iconButton('swap', ICONS.arrowSwitch, entry ? 'Change team' : 'Select team'),
+            entry ? iconButton('clear', ICONS.x, 'Clear team', {extraClass: 'uc-clear'}) : '',
+        ].join('');
+
+        el.querySelector('.uc-team-slots').innerHTML = memberChipsHtml(
+            entry?.team.members ?? Array(TEAM_SIZE).fill(null), entry?.team.memberNames ?? [], {pickable: true});
+    }
+
+    function setTeam(slot, entry) {
+        teams[slot] = entry;
+        lastRun = null;
+        renderBox(slot);
+        status();
+    }
+
+    /** Copy a saved team's name into the box, and its uma nicknames while the umas still match. */
+    function syncFromRoster(entry) {
+        const saved = roster.resolveTeam(entry.rosterId);
+        entry.name = entry.team.name = teamDisplayName(saved);
+        if (!isModified(entry)) entry.team.memberNames = saved.memberNames;
+    }
+
+    /**
+     * After a box's umas change: work out the id its umas would have as a saved team. A box based
+     * on a saved team stays based on it (now with unsaved changes, unless the umas match again);
+     * a box without one links up with a saved team whose umas it now matches exactly.
+     */
+    async function membersChanged(entry) {
+        entry.currentId = isComplete(entry)
+            ? await hashOf(await Promise.all(entry.team.members.map((member) => hashOf(member))))
+            : null;
+        entry.team.id = entry.currentId ?? entry.rosterId;
+        if (!savedTeam(entry) && entry.currentId && roster.team(entry.currentId)) entry.rosterId = entry.currentId;
+        if (savedTeam(entry)) syncFromRoster(entry);
+    }
+
+    const emptyEntry = () => ({
+        name: null, rosterId: null, currentId: null,
+        team: {id: null, members: Array(TEAM_SIZE).fill(null), memberNames: Array(TEAM_SIZE).fill(null)},
+    });
+
+    /**
+     * Save the box's team and return its id. Its umas are added (or reused). A box based on a
+     * saved team updates that team (keeping its name and favorite); otherwise a new team is saved,
+     * keeping the box's name if it has one or getting a random canonical team name.
+     */
+    async function saveSlot(slot) {
+        const entry = teams[slot];
+        if (!isComplete(entry)) throw new Error(`A team needs ${TEAM_SIZE} umas before it can be saved`);
+        const umaIds = [];
+        for (const member of entry.team.members) umaIds.push(await roster.addUma(member));
+        let id = await hashOf(umaIds);
+        const base = savedTeam(entry);
+        if (base && base.id !== id) {
+            entry.currentId = id;
+            entry.rosterId = id; // so the onChange re-render already sees the saved version
+            id = await roster.updateTeam(base.id, umaIds);
+        } else if (!roster.team(id)) {
+            const taken = new Set(roster.teams().map((team) => team.name).filter(Boolean));
+            entry.currentId = entry.rosterId = id;
+            await roster.addTeam(umaIds, {name: entry.name ?? randomTeamName(taken)});
+        }
+        entry.rosterId = entry.currentId = entry.team.id = id;
+        syncFromRoster(entry);
+        renderBox(slot);
+        status();
+        return id;
+    }
+
+    const picker = createTeamPicker({
+        roster,
+        onSelect(slot, id) {
+            if (!confirmDiscard(slot)) return;
+            const resolved = roster.resolveTeam(id);
+            const name = teamDisplayName(resolved);
+            setTeam(slot, {name, rosterId: id, currentId: id, team: loadTeam(resolved, name)});
+        },
+    });
+
+    /** Put a saved uma into one slot of a box. */
+    async function putUma(slot, index, umaId) {
+        const uma = roster.uma(umaId);
+        const entry = teams[slot] ?? emptyEntry();
+        validateTeamMembers(entry.team.members.map((member, k) => k === index ? uma.data : member));
+        entry.team.members[index] = structuredClone(uma.data);
+        entry.team.memberNames ??= Array(TEAM_SIZE).fill(null);
+        entry.team.memberNames[index] = uma.name;
+        await membersChanged(entry);
+        setTeam(slot, entry);
+    }
+
+
+    const umaPicker = createUmaPicker({
+        roster,
+        onSelect: ({slot, index}, umaId) => putUma(slot, index, umaId),
+        onEdit: (savedUmaId) => {
+            const uma = roster.uma(savedUmaId);
+            umaEditor.open({savedUmaId}, uma.data, uma.name, currentCourse());
+        },
+        // "New uma": a blank editor; confirming it saves the uma and puts it in this slot.
+        onNew: ({slot, index}) => umaEditor.open({slot, index, isNew: true}, newUmaDraft(), null, currentCourse()),
+    });
+
+    const umaEditor = createUmaEditor({
+        onClose: (target) => {
+            if (target?.savedUmaId) umaPicker.resume();
+        },
+        /**
+         * Confirm: save the edited uma. If the old version is saved, it's replaced (saved teams
+         * that used it follow the new version); otherwise the new version is added. Every box
+         * slot that held the old version then shows the new one. A new uma is saved and put
+         * into the slot "New uma" was opened from.
+         */
+        async onConfirm({slot, index, isNew, savedUmaId}, data, nickname, {asCopy = false} = {}) {
+            if (!savedUmaId) validateTeamMembers((teams[slot]?.team.members ?? Array(TEAM_SIZE).fill(null))
+                .map((member, k) => k === index ? data : member));
+            if (!isNew && !asCopy) {
+                const old = savedUmaId ?? await hashOf(teams[slot].team.members[index]);
+                for (const entry of teams) {
+                    if (!entry) continue;
+                    const members = await Promise.all(entry.team.members.map(async (member) =>
+                        member && await hashOf(member) === old ? data : member));
+                    validateTeamMembers(members);
+                }
+            }
+            if (isNew || asCopy) {
+                // A new uma, or "Save as copy": save it as its own uma and put it in this slot only;
+                // the original (and everything using it) is left alone.
+                const existed = Boolean(roster.uma(await hashOf(data)));
+                const id = await roster.addUma(data);
+                // Identical stats/skills are the same saved uma; don't rename that one from a copy.
+                if (!existed || isNew) roster.renameUma(id, nickname);
+                if (!savedUmaId) await putUma(slot, index, id);
+                return;
+            }
+            const oldId = savedUmaId ?? await hashOf(teams[slot].team.members[index]);
+            // Saved teams holding the old uma get new ids when it's replaced; remember their
+            // umas so each box can follow its saved team.
+            const bases = teams.map((entry) => savedTeam(entry)?.members.slice() ?? null);
+            const newId = roster.uma(oldId) ? await roster.updateUma(oldId, data) : await roster.addUma(data);
+            roster.renameUma(newId, nickname);
+            for (const [s, entry] of teams.entries()) {
+                if (!entry) continue;
+                let changed = false;
+                if (bases[s]?.includes(oldId)) {
+                    entry.rosterId = await hashOf(bases[s].map((id) => (id === oldId ? newId : id)));
+                    changed = true;
+                }
+                for (const [k, member] of entry.team.members.entries()) {
+                    if (!member || !((s === slot && k === index) || await hashOf(member) === oldId)) continue;
+                    entry.team.members[k] = structuredClone(data);
+                    entry.team.memberNames ??= Array(TEAM_SIZE).fill(null);
+                    entry.team.memberNames[k] = nickname;
+                    changed = true;
+                }
+                if (changed) {
+                    await membersChanged(entry);
+                    setTeam(s, entry);
+                }
+            }
+        },
+    });
+
+    /** Empty one uma slot of a box (the chip's ✕, or right-clicking the chip). The team stays. */
+    async function clearUma(slot, index) {
+        const entry = teams[slot];
+        if (!entry?.team.members[index]) return;
+        entry.team.members[index] = null;
+        if (entry.team.memberNames) entry.team.memberNames[index] = null;
+        await membersChanged(entry);
+        // An unsaved box with no umas left is just empty again.
+        setTeam(slot, entry.team.members.some(Boolean) || savedTeam(entry) ? entry : null);
+    }
+
+    boxes.forEach((el, slot) => {
+        // Right-clicking a filled uma chip removes that uma (instead of the browser's menu).
+        el.addEventListener('contextmenu', async (event) => {
+            const chip = event.target.closest('.uc-member-pickable[data-index]');
+            if (!chip) return;
+            event.preventDefault();
+            try {
+                await clearUma(slot, Number(chip.dataset.index));
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        el.addEventListener('click', async (event) => {
+            const target = event.target.closest('[data-action]');
+            if (!target || target.disabled) return;
+            const entry = teams[slot];
+            try {
+                switch (target.dataset.action) {
+                    case 'swap': // asks about unsaved changes once a team is picked
+                        picker.open(slot);
+                        break;
+                    case 'pick-uma': // "Add Uma": choose a saved uma
+                        umaPicker.open({slot, index: Number(target.dataset.index)});
+                        break;
+                    case 'edit-uma': { // a filled chip: open the editor on that uma
+                        const index = Number(target.dataset.index);
+                        // The selected meeting's course decides which aptitudes a new character's defaults fill in.
+                        const course = currentCourse();
+                        umaEditor.open({
+                            slot,
+                            index
+                        }, entry.team.members[index], entry.team.memberNames?.[index], course);
+                        break;
+                    }
+                    case 'clear-uma': // the ✕ on a chip: empty just that slot
+                        await clearUma(slot, Number(target.dataset.index));
+                        break;
+                    case 'clear':
+                        if (confirmDiscard(slot)) setTeam(slot, null);
+                        break;
+                    case 'save':
+                        await saveSlot(slot);
+                        break;
+                    case 'favorite': {
+                        const saved = savedTeam(entry);
+                        if (saved) roster.toggleFavoriteTeam(saved.id);
+                        else roster.setFavoriteTeam(await saveSlot(slot), true); // starring an unsaved team saves it
+                        break;
+                    }
+                    case 'delete': {
+                        const saved = savedTeam(entry);
+                        if (saved && confirm(`Delete saved team "${teamDisplayName(saved)}"? It stays in this box until you clear it.`)) {
+                            roster.removeTeam(saved.id);
+                        }
+                        break;
+                    }
+                    case 'rename':
+                        if (savedTeam(entry)) {
+                            renameSavedTeam(roster, entry.rosterId, target, {
+                                onCancel: () => renderBox(slot),
+                                onError: alert
+                            });
+                        }
+                        break;
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+        // Keyboard: Enter or Space on the (saved) team name starts a rename; on an uma chip, changes it.
+        el.addEventListener('keydown', (event) => {
+            const action = event.target.dataset?.action;
+            if ((event.key === 'Enter' || event.key === ' ') && event.target.tagName !== 'BUTTON'
+                && (action === 'rename' || action === 'pick-uma' || action === 'edit-uma')) {
+                event.preventDefault();
+                event.target.click();
+            }
+        });
+        renderBox(slot);
+    });
+
+    // Any roster change (rename, favorite, delete, here or in the modal) refreshes the boxes.
+    roster.onChange(() => {
+        teams.forEach((entry, slot) => {
+            if (savedTeam(entry)) syncFromRoster(entry);
+            // Don't yank a rename box out from under the user mid-edit in another box.
+            if (!boxes[slot].querySelector('.uc-rename-input')) renderBox(slot);
+        });
+        status();
+    });
+
+    // Leaving or reloading the page with unsaved team changes asks first (the browser's own prompt).
+    window.addEventListener('beforeunload', (event) => {
+        if (teams.some(hasUnsavedChanges)) event.preventDefault();
+    });
 
     $('compact').addEventListener('change', () => {
-      if (lastRun) output.textContent = report({ ...lastRun, compact: $('compact').checked });
+        if (lastRun) output.textContent = report({...lastRun, compact: $('compact').checked});
     });
 
     /** Run the trials across Web Workers; results come back in trial order. */
     async function runTrials(context, trials, onProgress) {
-      const size = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, trials.length));
-      const chunk = Math.max(1, Math.min(16, Math.ceil(trials.length / (size * 4))));
-      const results = new Array(trials.length);
-      let next = 0;
-      const workers = [];
-      const call = (worker, message) => new Promise((resolve, reject) => {
-        worker.onmessage = ({ data }) => data.type === 'error' ? reject(new Error(data.message)) : resolve(data);
-        worker.onerror = (event) => { event.preventDefault(); reject(new Error(event.message || 'Worker failed')); };
-        worker.postMessage(message);
-      });
-      try {
-        await Promise.all(Array.from({ length: size }, async () => {
-          const worker = new Worker(new URL('./compare-worker.js', import.meta.url), { type: 'module' });
-          workers.push(worker);
-          await call(worker, { type: 'init', context });
-          while (next < trials.length) {
-            const start = next;
-            next = Math.min(trials.length, next + chunk);
-            const { results: batch } = await call(worker, { type: 'run', trials: trials.slice(start, next) });
-            batch.forEach((result, i) => { results[start + i] = result; });
-            onProgress(batch);
-          }
-        }));
-      } finally {
-        for (const worker of workers) worker.terminate();
-      }
-      return results;
+        const size = Math.max(1, Math.min(navigator.hardwareConcurrency || 4, trials.length));
+        const chunk = Math.max(1, Math.min(16, Math.ceil(trials.length / (size * 4))));
+        const results = new Array(trials.length);
+        let next = 0;
+        const workers = [];
+        const call = (worker, message) => new Promise((resolve, reject) => {
+            worker.onmessage = ({data}) => data.type === 'error' ? reject(new Error(data.message)) : resolve(data);
+            worker.onerror = (event) => {
+                event.preventDefault();
+                reject(new Error(event.message || 'Worker failed'));
+            };
+            worker.postMessage(message);
+        });
+        try {
+            await Promise.all(Array.from({length: size}, async () => {
+                const worker = new Worker(new URL('./compare-worker.js', import.meta.url), {type: 'module'});
+                workers.push(worker);
+                await call(worker, {type: 'init', context});
+                while (next < trials.length) {
+                    const start = next;
+                    next = Math.min(trials.length, next + chunk);
+                    const {results: batch} = await call(worker, {type: 'run', trials: trials.slice(start, next)});
+                    batch.forEach((result, i) => {
+                        results[start + i] = result;
+                    });
+                    onProgress(batch);
+                }
+            }));
+        } finally {
+            for (const worker of workers) worker.terminate();
+        }
+        return results;
     }
 
     runButton.addEventListener('click', async () => {
-      const n = Number($('trials').value);
-      if (!Number.isInteger(n) || n < 2) {
-        output.textContent = 'Trials must be an integer of at least 2 (for a confidence interval).';
-        return;
-      }
-      running = true;
-      lastRun = null;
-      status();
-      const started = performance.now();
-      try {
-        const cm = cmFromNumber(Number($('cm').value));
-        const teamA = teams.A.team;
-        const teamB = teams.B.team;
-        const testedIds = new Set([teamA.id, teamB.id]);
-        const pool = (await loadPool($('pool').value)).filter((team) => !testedIds.has(team.id));
-        if (pool.length < 2) throw new Error('The team pool needs at least 2 opponent teams besides the tested teams');
-
-        const trials = drawTrials(n, pool.length);
-        let done = 0;
-        let winsA = 0;
-        let winsB = 0;
-        output.textContent = `Running 0/${n} trials...`;
-        const results = await runTrials({ cm, teamA, teamB, pool }, trials, (batch) => {
-          for (const [a, b] of batch) {
-            done++;
-            winsA += Math.min(...a.orders) === 0;
-            winsB += Math.min(...b.orders) === 0;
-          }
-          output.textContent = `Running ${done}/${n} trials...  A wins ${winsA}, B wins ${winsB}`;
-        });
-
-        const tallyA = new Tally(teamA, teams.A.name);
-        const tallyB = new Tally(teamB, teams.B.name);
-        for (const [a, b] of results) {
-          tallyA.add(a);
-          tallyB.add(b);
+        const n = Number($('trials').value);
+        if (!Number.isInteger(n) || n < 2) {
+            output.textContent = 'Trials must be an integer of at least 2 (for a confidence interval).';
+            return;
         }
-        lastRun = { cm, n, poolSize: pool.length, tallyA, tallyB };
-        console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
-        output.textContent = report({ ...lastRun, compact: $('compact').checked });
-      } catch (error) {
-        output.textContent = `Error: ${error.message}`;
-      } finally {
-        running = false;
+        running = true;
+        lastRun = null;
         status();
-      }
+        const started = performance.now();
+        try {
+            const race = currentRace();
+            const tested = teams.map((entry) => entry.team);
+            tested.forEach((team) => validateTeamMembers(team.members));
+            // Leave the tested teams out of the opponents, matched by id or by identical members.
+            const testedIds = new Set(tested.map((team) => team.id));
+            const testedMembers = new Set(tested.map((team) => canonicalJson(team.members)));
+            const pool = (await loadPool($('pool').value))
+                .filter((team) => !testedIds.has(team.id) && !testedMembers.has(canonicalJson(team.members)));
+            if (pool.length < 2) throw new Error('The team pool needs at least 2 opponent teams besides the tested teams');
+
+            const trials = drawTrials(n, pool.length);
+            let done = 0;
+            const wins = tested.map(() => 0);
+            output.textContent = `Running 0/${n} trials...`;
+            const results = await runTrials({race, teams: tested, pool}, trials, (batch) => {
+                for (const perTeam of batch) {
+                    done++;
+                    perTeam.forEach((result, slot) => {
+                        wins[slot] += Math.min(...result.orders) === 0;
+                    });
+                }
+                output.textContent = `Running ${done}/${n} trials...  `
+                    + wins.map((count, slot) => `${slotLabel(slot)} wins ${count}`).join(', ');
+            });
+
+            const tallies = teams.map((entry, slot) => new Tally(entry.team, entry.name ?? slotLabel(slot)));
+            for (const perTeam of results) perTeam.forEach((result, slot) => tallies[slot].add(result));
+            lastRun = {race, n, poolSize: pool.length, tallies, labels: tallies.map((_, slot) => slotLabel(slot))};
+            console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
+            output.textContent = report({...lastRun, compact: $('compact').checked});
+        } catch (error) {
+            output.textContent = `Error: ${error.message}`;
+        } finally {
+            running = false;
+            status();
+        }
     });
 
     status();
-  </script>
+</script>
 </body>
 </html>

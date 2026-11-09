@@ -21,6 +21,8 @@
 //
 // crypto.subtle needs a secure context: https:// (GitHub Pages) or http://localhost.
 
+import { validateTeamMembers } from './team-rules.js';
+
 export const STORAGE_KEY = 'umacompare:roster';
 export const TEAM_SIZE = 3;
 const VERSION = 1;
@@ -105,6 +107,9 @@ export class Roster {
   async updateUma(id, data) {
     checkUmaData(data);
     this.#require('umas', id);
+    for (const team of this.teamsUsing(id)) {
+      validateTeamMembers(team.members.map((m) => m === id ? data : this.#require('umas', m).data));
+    }
     const newId = await hashOf(data);
     if (newId === id) return id;
     const remapped = await this.#remapTeams((members) => members.map((m) => (m === id ? newId : m)));
@@ -214,7 +219,7 @@ export class Roster {
     this.#commit((state) => { delete state.teams[id]; });
   }
 
-  /** The team with its umas' runner JSON inlined: { id, name, favorite, members: [data x3] }. */
+  /** The team with its umas' runner JSON inlined: { id, name, favorite, members: [data x3], memberNames: [nickname or null x3] }. */
   resolveTeam(id) {
     const team = this.#require('teams', id);
     return {
@@ -222,6 +227,7 @@ export class Roster {
       name: team.name,
       favorite: Boolean(team.favorite),
       members: team.members.map((umaId) => structuredClone(this.#require('umas', umaId).data)),
+      memberNames: team.members.map((umaId) => this.#require('umas', umaId).name ?? null),
     };
   }
 
@@ -235,6 +241,7 @@ export class Roster {
       throw new Error(`a team needs exactly ${TEAM_SIZE} members`);
     }
     members.forEach(checkUmaData);
+    validateTeamMembers(members);
     const ids = [];
     for (const member of members) ids.push(await this.addUma(member));
     return this.addTeam(ids, { name, favorite });
@@ -274,6 +281,7 @@ export class Roster {
       }
       const id = await hashOf(members);
       const existing = next.teams[id];
+      validateTeamMembers(members.map((m) => next.umas[m].data));
       if (existing) existing.favorite = Boolean(existing.favorite || team.favorite);
       else next.teams[id] = { id, name: team.name ?? null, favorite: Boolean(team.favorite), members, addedAt: team.addedAt ?? Date.now() };
     }
@@ -345,6 +353,7 @@ export class Roster {
       throw new Error(`a team needs exactly ${TEAM_SIZE} members`);
     }
     for (const id of memberIds) this.#require('umas', id);
+    validateTeamMembers(memberIds.map((id) => this.#require('umas', id).data));
   }
 
   /** Rebuild every team with `mapMembers` applied, rehashing ids (teams that collapse into one merge). */

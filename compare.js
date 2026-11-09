@@ -6,8 +6,10 @@
 // so the only difference between the two races is which team is being tested: the
 // runner in team slot k gets the same gate in both races.
 import {
-  ChampionsMeeting, PreparedRace, RaceBuilder, Strategy, UmaBuilder, championsMeetingLabel, nameOf, umaLabel,
+  ChampionsMeeting, Course, PreparedRace, RaceBuilder, RacePreset, Strategy, UmaBuilder, championsMeetingLabel, nameOf,
+  umaLabel,
 } from './globalsim/index.js';
+import { validateTeamMembers } from './team-rules.js';
 
 export const MOOD = 2; // Champions Meeting runners are at Great mood
 const SKILL_LINE = /^ {4}.* {2}#(\d+)\s+Lv\d/; // a skill row in UmaBuilder's summary
@@ -36,8 +38,30 @@ export function cmFromNumber(number) {
 
 export const cmLabel = (cm) => championsMeetingLabel(cm);
 
+// ---- race conditions ----
+// A race is a plain object (it goes to the workers): { courseId, ground, weather, season, time }
+// plus `preset`, the meeting's name when the conditions are exactly a Champions Meeting's.
+
+/** The race conditions of a Champions Meeting. */
+export function raceFromMeeting(cm) {
+  const p = RacePreset.championsMeeting(cm);
+  return { courseId: p.course.id, ground: p.ground, weather: p.weather, season: p.season, time: p.time, preset: p.name };
+}
+
+/** A RaceBuilder for race conditions (Global ground names, e.g. 'Firm'). */
+export function buildRace(race) {
+  return RaceBuilder.fromCourse(race.courseId)
+    .ground(race.ground).weather(race.weather).season(race.season).time(race.time);
+}
+
+/** "Aquarius Cup 2", or for custom conditions "Tokyo Dirt 1600m (Mile, left-handed), Soft, Snowy, Winter, Midday". */
+export function raceLabel(race) {
+  if (race.preset) return race.preset;
+  return `${Course.get(race.courseId)}, ${race.ground}, ${race.weather}, ${race.season}, ${race.time}`;
+}
+
 const titleCase = (name) => name.toLowerCase().split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
-const strategyName = (strategy) => titleCase(nameOf(Strategy, strategy) ?? String(strategy));
+export const strategyName = (strategy) => titleCase(nameOf(Strategy, strategy) ?? String(strategy));
 
 /** A team from a file: {"id": ..., "members": [...]} or a list of 3 runners. */
 export function loadTeam(data, fileStem) {
@@ -46,6 +70,7 @@ export function loadTeam(data, fileStem) {
     throw new Error(`a team needs exactly ${TEAM_SIZE} members`);
   }
   team.id ??= fileStem;
+  validateTeamMembers(team.members);
   // Validate now rather than on the first trial.
   team.members.forEach((member, i) => {
     try {
@@ -57,8 +82,13 @@ export function loadTeam(data, fileStem) {
   return team;
 }
 
+/** Member k's display name: its saved nickname (team.memberNames[k]) or the character's name. */
+export function memberName(team, k) {
+  return team.memberNames?.[k] || umaLabel(team.members[k].charaId);
+}
+
 export function teamLabel(team) {
-  return team.members.map((m) => `${umaLabel(m.charaId)} (${strategyName(m.strategy)})`).join(', ');
+  return team.members.map((m, k) => `${memberName(team, k)} (${strategyName(m.strategy)})`).join(', ');
 }
 
 /**
@@ -104,8 +134,8 @@ function activatedSkills(metadata, horseCount) {
  * Race the tested team (slots 0-2) against the opponents (slots 3-8). Returns the tested
  * team's finish orders (0 = 1st), metres and seconds behind the winner, and activated skills.
  */
-async function runTrial(cm, tested, opponents, seed, gates) {
-  const race = RaceBuilder.championsMeeting(cm).seed(seed);
+async function runTrial(raceConditions, tested, opponents, seed, gates) {
+  const race = buildRace(raceConditions).seed(seed);
   let slot = 0;
   [tested, ...opponents].forEach((team, t) => {
     for (const member of team.members) {
@@ -132,10 +162,15 @@ async function runTrial(cm, tested, opponents, seed, gates) {
   };
 }
 
-/** One trial for both tested teams with the same seed, opponents and gates. */
-export async function runPairedTrial({ cm, teamA, teamB, pool }, [seed, opponentIndices, gates]) {
+/**
+ * One trial for every tested team with the same seed, opponents and gates.
+ * Returns one runTrial result per team, in the order of `teams`.
+ */
+export async function runSharedTrial({ race, teams, pool }, [seed, opponentIndices, gates]) {
   const opponents = opponentIndices.map((i) => pool[i]);
-  return [await runTrial(cm, teamA, opponents, seed, gates), await runTrial(cm, teamB, opponents, seed, gates)];
+  const results = [];
+  for (const team of teams) results.push(await runTrial(race, team, opponents, seed, gates));
+  return results;
 }
 
 // Trial generation: Python's random.Random equivalents over a uniform [0, 1) source.
@@ -268,19 +303,27 @@ function printFull(out, name, tally, n) {
 function printCompact(out, name, tally, n) {
   out.push(`${name}: ${tally.name}`, `  ${winRateLine(tally, n)}`);
   tally.team.members.forEach((member, k) => {
-    const label = `${umaLabel(member.charaId)} (${strategyName(member.strategy)})`;
+    const label = `${memberName(tally.team, k)} (${strategyName(member.strategy)})`;
     out.push(`    ${label.padEnd(32)} ${statLine(tally, k)}`);
   });
   out.push('');
 }
 
-/** The comparison report for finished tallies. */
-export function report({ cm, n, poolSize, tallyA, tallyB, compact }) {
-  const out = ['', `${cmLabel(cm)}: ${n} trials against ${poolSize} possible opponent teams (${LEVEL})`, ''];
-  for (const [name, tally] of [['A', tallyA], ['B', tallyB]]) (compact ? printCompact : printFull)(out, name, tally, n);
-  // Both teams race the same seeds, opponents and gates, so compare them per trial.
-  const [difference, half] = pairedDifferenceCi(tallyA.wins.map((a, i) => a - tallyB.wins[i]));
-  out.push(`Team win % difference (${tallyA.name} - ${tallyB.name}): ${signedPercent(difference)}  `
-    + `(${LEVEL} ${signedPercent(difference - half)} to ${signedPercent(difference + half)})`);
+/**
+ * The comparison report for finished tallies: one per tested team, any number of teams.
+ * `labels` heads each team's section; it defaults to Team 1, Team 2, ...
+ */
+export function report({ race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact }) {
+  const out = ['', `${raceLabel(race)}: ${n} trials against ${poolSize} possible opponent teams (${LEVEL})`, ''];
+  tallies.forEach((tally, i) => (compact ? printCompact : printFull)(out, labels[i], tally, n));
+  // Every team races the same seeds, opponents and gates, so compare each pair per trial.
+  for (let i = 0; i < tallies.length; i++) {
+    for (let j = i + 1; j < tallies.length; j++) {
+      const [a, b] = [tallies[i], tallies[j]];
+      const [difference, half] = pairedDifferenceCi(a.wins.map((win, t) => win - b.wins[t]));
+      out.push(`Team win % difference (${a.name} - ${b.name}): ${signedPercent(difference)}  `
+        + `(${LEVEL} ${signedPercent(difference - half)} to ${signedPercent(difference + half)})`);
+    }
+  }
   return out.join('\n');
 }

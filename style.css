@@ -35,6 +35,8 @@
   --uc-radius-lg: 12px;
   --uc-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   --uc-transition: 0.18s ease;
+  /* Vertical stretch applied to every uma portrait (1 = as drawn). */
+  --uc-portrait-stretch: 1.08;
 }
 
 body {
@@ -167,4 +169,1184 @@ body {
   --bs-btn-disabled-bg: #f472b6;
   --bs-btn-disabled-border-color: #f472b6;
   font-weight: 600;
+}
+
+/* ---- Team boxes (one per compared team, stacked) ---------------------------------------- */
+.uc-teams {
+  display: grid;
+  gap: 15px;
+}
+
+.uc-team {
+  padding: 15px;
+  border: 1px solid rgba(75, 85, 99, 0.6);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+}
+
+.uc-team > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--uc-border);
+}
+
+.uc-team-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--uc-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.uc-team-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+/* Icon buttons: GitHub-style star (outline -> filled when saved) and pencil. */
+.uc-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--uc-text-secondary);
+  transition: color var(--uc-transition), background-color var(--uc-transition), border-color var(--uc-transition);
+}
+
+.uc-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.uc-icon-button:hover,
+.uc-icon-button:focus-visible {
+  color: var(--uc-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--uc-border);
+}
+
+.uc-star .uc-star-fill { display: none; }
+.uc-star[aria-pressed="true"] { color: var(--uc-pink); }
+.uc-star[aria-pressed="true"] .uc-star-fill { display: block; }
+.uc-star[aria-pressed="true"] .uc-star-outline { display: none; }
+
+.uc-link {
+  margin-left: 6px;
+  padding: 5px 0;
+  border: 0;
+  background: none;
+  color: var(--uc-pink-light);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.uc-link:hover {
+  color: var(--uc-pink);
+  text-decoration: underline;
+}
+
+.uc-team-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uc-add-uma {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px dashed rgba(244, 114, 182, 0.4);
+  border-radius: 6px;
+  background: rgba(244, 114, 182, 0.04);
+  color: var(--uc-text-primary);
+  text-align: left;
+  transition: border-color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-add-uma:hover:not(:disabled) {
+  border-color: var(--uc-pink);
+  background: rgba(244, 114, 182, 0.1);
+}
+
+.uc-add-uma > span {
+  display: grid;
+  flex: 0 0 35px;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: rgba(244, 114, 182, 0.18);
+  color: var(--uc-pink-light);
+  font-size: 18px;
+}
+
+.uc-add-uma strong {
+  font-size: 12px;
+}
+
+
+@media (max-width: 576px) {
+  .uc-team-slots { grid-template-columns: 1fr; }
+}
+
+/* ---- Uma chips (a selected team's members) ---------------------------------------------- */
+.uc-member {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px 9px;
+  border: 1px solid var(--uc-border);
+  border-radius: 6px;
+  background: var(--uc-bg-2);
+}
+
+.uc-member-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.uc-member-badge {
+  position: relative;
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(244, 114, 182, 0.18);
+  color: var(--uc-pink-light);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Portrait sits over the initials; if it fails to load it is removed and the initials show. */
+.uc-member-badge img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* With a portrait, drop the pink circle and the round clip: the icon draws its own white
+   circle and its ears may poke out. The pink circle stays for the initials fallback. */
+.uc-member-badge:has(img) {
+  overflow: visible;
+  border-radius: 0;
+  background: none;
+}
+
+.uc-member-title {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.uc-member-title strong,
+.uc-member-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uc-member-title strong {
+  font-size: 12px;
+}
+
+.uc-member-title small {
+  color: var(--uc-text-secondary);
+  font-size: 10px;
+}
+
+/* Five stats: label over value. */
+.uc-member-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 8px 8px 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.uc-member-stats dt {
+  color: var(--uc-text-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.uc-member-stats dt img {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+}
+
+.uc-member-stats dd {
+  margin: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Aptitudes sit at the right end of the name row: short label over the grade glyph. */
+.uc-member-apts {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, auto);
+  gap: 0 6px;
+  margin: 0 0 0 auto;
+  padding: 2px 0;
+  text-align: center;
+}
+
+.uc-member-apts dt {
+  color: var(--uc-text-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.uc-member-apts dd {
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+/* Aptitude grades use the game's letter glyphs (assets/grades/); .uc-grade-none is the text fallback. */
+.uc-grade {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.uc-grade-none {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--uc-bg-3);
+  color: var(--uc-text-secondary);
+  font-size: 10px;
+}
+
+/* ---- Saved Teams modal ------------------------------------------------------------------ */
+.uc-modal {
+  width: min(1040px, calc(100vw - 32px));
+  max-height: min(85vh, 900px);
+  padding: 0;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-lg);
+  background: var(--uc-bg-2);
+  color: var(--uc-text-primary);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.uc-modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.uc-modal::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.uc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 19px 24px 17px;
+  border-bottom: 1px solid var(--uc-border);
+}
+
+.uc-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.uc-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.uc-modal-search {
+  padding: 17px 24px 5px;
+}
+
+.uc-modal-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.uc-picker-count {
+  flex: 0 0 auto;
+  color: var(--uc-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.uc-modal-error {
+  margin: 8px 0 0;
+  color: #f87171;
+  font-size: 0.85rem;
+  white-space: pre-line;
+}
+
+.uc-picker-list {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 24px 24px;
+  overflow-y: auto;
+}
+
+/* The whole card selects the team; its icon buttons do their own thing. */
+.uc-picker-team {
+  cursor: pointer;
+  transition: border-color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-picker-team:hover {
+  border-color: rgba(244, 114, 182, 0.6);
+  background: #262a30;
+}
+
+.uc-picker-team:focus-visible {
+  outline: 2px solid var(--uc-pink);
+  outline-offset: 2px;
+}
+
+.uc-picker-team .uc-team-actions {
+  cursor: default;
+}
+
+.uc-rename-input {
+  max-width: 320px;
+}
+
+.uc-picker-empty {
+  margin: 24px 0;
+  color: var(--uc-text-secondary);
+  text-align: center;
+}
+
+.uc-delete:hover,
+.uc-delete:focus-visible {
+  color: #f87171;
+}
+
+.btn-outline-pink {
+  --bs-btn-color: var(--uc-pink-light);
+  --bs-btn-border-color: rgba(244, 114, 182, 0.6);
+  --bs-btn-hover-color: #1a1d21;
+  --bs-btn-hover-bg: #f472b6;
+  --bs-btn-hover-border-color: #f472b6;
+  --bs-btn-focus-shadow-rgb: 244, 114, 182;
+  --bs-btn-active-color: #1a1d21;
+  --bs-btn-active-bg: #ec4899;
+  --bs-btn-active-border-color: #ec4899;
+}
+
+.uc-clear:hover,
+.uc-clear:focus-visible {
+  color: #f87171;
+}
+
+/* Team name in the modal: click (or Enter) to rename. */
+.uc-renamable {
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -4px;
+  transition: background-color var(--uc-transition), color var(--uc-transition);
+}
+
+.uc-renamable:hover,
+.uc-renamable:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--uc-text-primary);
+  outline: none;
+}
+
+/* Narrow chips (e.g. in the modal): drop the stat text labels and keep just the icons. */
+.uc-member {
+  container-type: inline-size;
+}
+
+@container (max-width: 260px) {
+  .uc-member-stats dt span {
+    display: none;
+  }
+
+  .uc-member-stats dt img {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* Icon buttons that can't act yet (e.g. save before all 3 umas are chosen). */
+.uc-icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.uc-icon-button:disabled:hover {
+  color: var(--uc-text-secondary);
+  background: none;
+  border-color: transparent;
+}
+
+/* ---- Uma chips you can click to change (team boxes) -------------------------------------- */
+.uc-member-pickable {
+  cursor: pointer;
+  transition: border-color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-member-pickable:hover {
+  border-color: rgba(244, 114, 182, 0.6);
+  background: #30353d;
+}
+
+.uc-member-pickable:focus-visible {
+  outline: 2px solid var(--uc-pink);
+  outline-offset: 2px;
+}
+
+/* ---- Saved Umas modal -------------------------------------------------------------------- */
+.uc-uma-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.uc-uma-card {
+  position: relative;
+  cursor: pointer;
+  background: var(--uc-bg-1);
+  transition: border-color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-uma-card:hover {
+  border-color: rgba(244, 114, 182, 0.6);
+  background: #262a30;
+}
+
+.uc-uma-card:focus-visible {
+  outline: 2px solid var(--uc-pink);
+  outline-offset: 2px;
+}
+
+/* Footer: "In N saved teams" on the left, star / trash on the right. */
+.uc-uma-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -2px -4px -4px 0;
+}
+
+.uc-uma-card-actions {
+  display: flex;
+  gap: 2px;
+  cursor: default;
+}
+
+.uc-uma-card-usage {
+  color: var(--uc-text-muted);
+  font-size: 10px;
+}
+
+/* ✕ in the corner of a team-box chip: removes that uma from the slot. Shown on hover/focus
+   (always on touch screens, which have no hover). */
+.uc-member-pickable {
+  position: relative;
+}
+
+.uc-member-pickable .uc-member-head {
+  padding-right: 24px;
+}
+
+.uc-chip-clear {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--uc-text-secondary);
+  opacity: 0;
+  transition: opacity var(--uc-transition), color var(--uc-transition), background-color var(--uc-transition);
+}
+
+.uc-chip-clear svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.uc-member-pickable:hover .uc-chip-clear,
+.uc-member-pickable:focus-within .uc-chip-clear {
+  opacity: 1;
+}
+
+.uc-chip-clear:hover,
+.uc-chip-clear:focus-visible {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+@media (hover: none) {
+  .uc-chip-clear { opacity: 1; }
+}
+
+/* Surface / Distance / Style filters under the uma search box. */
+.uc-apt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 10px;
+}
+
+.uc-apt-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+.uc-apt-filters .form-select {
+  width: auto;
+  min-width: 120px;
+}
+
+/* While a modal is open the page behind it doesn't scroll: lock the page, and stop the
+   modal's own list from handing leftover scroll to the page when it hits its top/bottom.
+   scrollbar-gutter keeps the layout from shifting when the page scrollbar goes away. */
+html {
+  scrollbar-gutter: stable;
+}
+
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+.uc-modal,
+.uc-picker-list {
+  overscroll-behavior: contain;
+}
+
+/* ---- Uma editor (modelled on the umalator uma editor) ------------------------------------ */
+.uc-editor {
+  width: min(920px, calc(100vw - 32px));
+  max-height: min(92vh, 1000px);
+}
+
+.uc-ed-body {
+  display: grid;
+  grid-auto-rows: max-content; /* rows keep their content height; the body scrolls instead */
+  gap: 20px;
+  min-height: 0;
+  padding: 20px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Character + nickname, with the portrait on the left. */
+.uc-ed-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* The icon draws its own white circle (ears poking out above it), so no frame around it. */
+.uc-ed-portrait {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.uc-ed-identity {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+.uc-ed-identity .form-label {
+  margin: 0;
+}
+
+.uc-ed-combo {
+  position: relative;
+}
+
+.uc-ed-combo-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.uc-ed-combo-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.uc-ed-combo-list li:hover,
+.uc-ed-combo-list li.active {
+  background: rgba(244, 114, 182, 0.14);
+}
+
+.uc-ed-combo-list img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+/* Stats: header strip with icons, then glyph + number input per stat. */
+.uc-ed-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+}
+
+.uc-ed-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 4px;
+  background: var(--uc-bg-3);
+  color: var(--uc-text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.uc-ed-stat-head img {
+  width: 18px;
+  height: 18px;
+}
+
+.uc-ed-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 12px;
+}
+
+.uc-ed-stat img {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.uc-ed-stat input {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Aptitudes + style. */
+.uc-ed-apts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.uc-ed-apt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+.uc-ed-apt .form-select {
+  width: auto;
+  min-width: 0;
+}
+
+.uc-ed-apt-select {
+  position: relative;
+}
+
+.uc-ed-apt-current {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(75, 85, 99, 0.6);
+  border-radius: 6px;
+  background: var(--uc-bg-3);
+}
+
+.uc-ed-apt-current:hover,
+.uc-ed-apt-current:focus-visible {
+  border-color: var(--uc-pink);
+  outline: none;
+}
+
+.uc-ed-apt-current img,
+.uc-ed-apt-menu img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.uc-ed-apt-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 38px);
+  gap: 4px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.uc-ed-apt-menu[hidden] {
+  display: none;
+}
+
+.uc-ed-apt-menu button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+}
+
+.uc-ed-apt-menu button:hover,
+.uc-ed-apt-menu button[aria-selected="true"] {
+  border-color: rgba(244, 114, 182, 0.6);
+  background: rgba(244, 114, 182, 0.12);
+}
+
+/* Skills: two columns of skill rows; the unique comes first. */
+.uc-ed-skills-head {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--uc-border);
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.uc-ed-skills {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uc-ed-skill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+}
+
+.uc-ed-skill-unique {
+  border-color: rgba(244, 114, 182, 0.55);
+  background: linear-gradient(90deg, rgba(244, 114, 182, 0.12), var(--uc-bg-1) 60%);
+}
+
+.uc-ed-skill-main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--uc-text-primary);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+button.uc-ed-skill-main:hover span {
+  color: var(--uc-pink-light);
+}
+
+.uc-ed-skill-main img {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+}
+
+.uc-ed-skill-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uc-ed-skill-level {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--uc-text-secondary);
+  font-size: 0.8rem;
+}
+
+.uc-ed-skill-level select {
+  padding: 2px 4px;
+  border: 1px solid rgba(75, 85, 99, 0.6);
+  border-radius: 4px;
+  background: var(--uc-bg-3);
+  color: var(--uc-text-primary);
+}
+
+.uc-ed-skill-remove {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--uc-text-secondary);
+}
+
+.uc-ed-skill-remove svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.uc-ed-skill-remove:hover {
+  background: rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+/* "+ Add Skill" / "+ Set unique skill" fill their whole row. */
+.uc-ed-skill:has(.uc-ed-add-skill) {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.uc-ed-add-skill {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  align-self: stretch;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 1px dashed rgba(244, 114, 182, 0.45);
+  border-radius: var(--uc-radius);
+  background: rgba(244, 114, 182, 0.04);
+  color: var(--uc-text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.uc-ed-add-skill:hover {
+  border-color: var(--uc-pink);
+  background: rgba(244, 114, 182, 0.1);
+}
+
+.uc-ed-add-skill span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(244, 114, 182, 0.18);
+  color: var(--uc-pink-light);
+  font-size: 18px;
+}
+
+/* Skill picker: a panel over the editor body. */
+.uc-ed-picker {
+  position: absolute;
+  z-index: 10;
+  inset: 70px 16px 74px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(244, 114, 182, 0.45);
+  border-radius: var(--uc-radius-lg);
+  background: var(--uc-bg-2);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+}
+
+.uc-ed-picker[hidden] {
+  display: none;
+}
+
+.uc-ed-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--uc-border);
+}
+
+.uc-ed-picker-head strong {
+  flex: 0 0 auto;
+}
+
+.uc-ed-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.uc-ed-picker-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+  color: var(--uc-text-primary);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.uc-ed-picker-list button:hover {
+  border-color: rgba(244, 114, 182, 0.6);
+  background: #262a30;
+}
+
+.uc-ed-picker-list img {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+}
+
+.uc-ed-picker-more {
+  grid-column: 1 / -1;
+  padding: 6px;
+  color: var(--uc-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Footer: Export on the left, Cancel / Confirm on the right. */
+.uc-ed-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--uc-border);
+}
+
+.uc-ed-footer .uc-modal-error {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.uc-ed-footer-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 700px) {
+  .uc-ed-stats { gap: 0 4px; }
+  .uc-ed-stat { flex-direction: column; }
+  .uc-ed-apts, .uc-ed-skills { grid-template-columns: 1fr 1fr; }
+}
+
+/* Stretch uma portraits a little taller than drawn (tune with --uc-portrait-stretch). */
+.uc-member-badge img,
+.uc-ed-portrait,
+.uc-ed-combo-list img {
+  transform: scaleY(var(--uc-portrait-stretch));
+}
+
+/* Pink dot after a team name: the box has changes that aren't saved yet. */
+.uc-unsaved-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-right: auto;
+  border-radius: 50%;
+  background: var(--uc-pink);
+}
+
+/* Anything hidden inside a modal stays hidden, whatever display it normally has. */
+.uc-modal [hidden] {
+  display: none !important;
+}
+
+/* Modal title with an optional back arrow in front of it. */
+.uc-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.uc-modal-title h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The editor title's unsaved-changes dot sits right after the title. */
+.uc-modal-header .uc-ed-dirty {
+  margin-left: -4px;
+}
+
+/* New uma: no character yet. */
+.uc-ed-portrait-empty {
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(244, 114, 182, 0.45);
+  border-radius: 50%;
+  color: var(--uc-pink-light);
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+/* ---- Saved Umas preview ------------------------------------------------------------------ */
+.uc-preview-identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--uc-text-secondary);
+}
+
+.uc-preview-identity h3 {
+  margin: 0;
+  color: var(--uc-text-primary);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.uc-preview-style {
+  color: var(--uc-pink-light);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.uc-preview-stat {
+  flex: 1 1 auto;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+
+.uc-preview-grade img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.uc-preview .uc-ed-apt strong {
+  color: var(--uc-text-primary);
+}
+
+/* Card section headings (Race, Teams). */
+.uc-section-title {
+  margin: 0 0 14px;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
