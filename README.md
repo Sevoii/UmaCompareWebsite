@@ -8,6 +8,8 @@ Uses WASM port of [Global Sim](https://github.com/Sevoii/GlobalSim)
 
 ## Why you should use this
 
+Tired of doing room matches and the uma interface? have no fear cause this tool uhhhhhhhh.. .. . helps maybe on that front i guess. also large samples lowers variance or something i forget
+
 Since this is literally just comparing 2 different teams, I see 2 main ways that we can use this:
 - Do A/B tests on 2 different teams
 - Do A/B tests on 2 different skills (change skills on one of the umas and see how its WR increases/decreases)
