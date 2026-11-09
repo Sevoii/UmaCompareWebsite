@@ -1,0 +1,170 @@
+/* Dark theme: stock Bootstrap 5.3 from the CDN, with its CSS variables overridden by a small set of --uc-* tokens. */
+
+:root,
+[data-bs-theme=dark] {
+  --bs-body-color: #f0f2f5;
+  --bs-body-color-rgb: 240, 242, 245;
+  --bs-body-bg: #1a1d21;
+  --bs-secondary-color: #9ba3b0;
+  --bs-emphasis-color: #f0f2f5;
+  --bs-border-color: rgba(75, 85, 99, 0.35);
+  --bs-secondary-bg: #343a40;
+  --bs-tertiary-bg: #343a40;
+  --bs-card-color: #f0f2f5;
+  --bs-card-bg: #2a2f36;
+  --bs-card-border-color: rgba(75, 85, 99, 0.35);
+  --bs-link-color: #f9a8d4;
+  --bs-link-color-rgb: 249, 168, 212;
+  --bs-link-hover-color: #f472b6;
+  --bs-link-hover-color-rgb: 244, 114, 182;
+  --bs-code-color: #f9a8d4;
+
+  --uc-bg-0: #1a1d21;
+  --uc-bg-1: #212529;
+  --uc-bg-2: #2a2f36;
+  --uc-bg-3: #343a40;
+  --uc-border: rgba(75, 85, 99, 0.35);
+  --uc-border-accent: rgba(244, 114, 182, 0.45);
+  --uc-accent: #f472b6;
+  --uc-pink: #f472b6;
+  --uc-pink-light: #f9a8d4;
+  --uc-text-primary: #f0f2f5;
+  --uc-text-secondary: #9ba3b0;
+  --uc-text-muted: #6b7280;
+  --uc-radius: 8px;
+  --uc-radius-lg: 12px;
+  --uc-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --uc-transition: 0.18s ease;
+}
+
+body {
+  background-color: var(--uc-bg-0);
+  color: var(--uc-text-primary);
+}
+
+/* Navbar: dark bar with a pink gradient underline and gradient brand text. */
+.uc-nav {
+  background: var(--uc-bg-1) !important;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(90deg, var(--uc-pink), var(--uc-pink-light)) 1;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.uc-nav .navbar-brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, var(--uc-pink), var(--uc-pink-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.03em;
+}
+
+.page-header {
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--uc-border);
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.page-header .page-subtitle {
+  color: var(--uc-text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 900px;
+}
+
+.card {
+  background-color: var(--uc-bg-2);
+  border-color: var(--uc-border);
+  box-shadow: var(--uc-shadow);
+}
+
+.form-label {
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.form-control,
+.form-select {
+  background-color: var(--uc-bg-3);
+  color: var(--uc-text-primary);
+  border-color: rgba(75, 85, 99, 0.5);
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--uc-bg-3);
+  color: var(--uc-text-primary);
+  border-color: var(--uc-accent);
+  box-shadow: 0 0 0 0.2rem rgba(244, 114, 182, 0.25);
+}
+
+.form-check-input:checked {
+  background-color: var(--uc-pink);
+  border-color: var(--uc-pink);
+}
+
+.form-check-input:focus {
+  border-color: var(--uc-pink);
+  box-shadow: 0 0 0 0.2rem rgba(244, 114, 182, 0.25);
+}
+
+/* Results box: monospace, never wraps (the report is column-aligned). */
+.uc-output {
+  white-space: pre;
+  overflow-x: auto;
+  background: var(--uc-bg-1);
+  color: var(--uc-text-primary);
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  padding: 12px;
+  margin: 0;
+  min-height: 6rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.output-title {
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.uc-footer {
+  margin-top: 32px;
+  padding: 18px 0 28px;
+  border-top: 1px solid rgba(127, 149, 189, 0.18);
+  color: rgba(235, 240, 255, 0.56);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Primary action button in the pink accent. */
+.btn-pink {
+  --bs-btn-color: #1a1d21;
+  --bs-btn-bg: #f472b6;
+  --bs-btn-border-color: #f472b6;
+  --bs-btn-hover-color: #1a1d21;
+  --bs-btn-hover-bg: #f9a8d4;
+  --bs-btn-hover-border-color: #f9a8d4;
+  --bs-btn-focus-shadow-rgb: 244, 114, 182;
+  --bs-btn-active-color: #1a1d21;
+  --bs-btn-active-bg: #ec4899;
+  --bs-btn-active-border-color: #ec4899;
+  --bs-btn-disabled-color: #1a1d21;
+  --bs-btn-disabled-bg: #f472b6;
+  --bs-btn-disabled-border-color: #f472b6;
+  font-weight: 600;
+}
