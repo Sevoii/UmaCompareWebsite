@@ -17,6 +17,11 @@ Why use this over Hakuraku/uma.moe race sims?
 - everything runs locally so you can bump up simulations to the high moon (they only allow 100 sims per run, you need probably 1,000-10,000 sims to get anything consistent)
 - randomly selects teams from the CM population that are actual team comps, so you can measure your performance across the field instead of against 2 teams
 
+## Things that i should probably put into the main website that i'm too lazy to right now
+
+- You can directly upload a race file from horseACT in the team import.
+- not sure what else
+
 ## Credits
 
 Hakuraku for vague styling inspos and some data
