@@ -5,7 +5,12 @@
     "cm": 22
   },
   {
-    "file": "cm22_teams.json",
+    "file": "cm22_full_teams.json",
+    "label": "CM22 representative teams (570 teams)",
+    "cm": 22
+  },
+  {
+    "file": "cm22_top_teams.json",
     "label": "CM22 teams (500 teams)",
     "cm": 22
   },
