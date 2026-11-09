@@ -1,5 +1,15 @@
 [
   {
+    "file": "cm22_midrange_teams.json",
+    "label": "CM22 midrange teams (500 teams)",
+    "cm": 22
+  },
+  {
+    "file": "cm22_teams.json",
+    "label": "CM22 teams (500 teams)",
+    "cm": 22
+  },
+  {
     "file": "cm21_midrange_teams.json",
     "label": "CM21 midrange teams (100 teams)",
     "cm": 21

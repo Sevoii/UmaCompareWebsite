@@ -1444,6 +1444,7 @@ export declare const Uma: {
     readonly BIWA_HAYAHIDE: 1023;
     readonly COPANO_RICKEY: 1098;
     readonly CURREN_CHAN: 1038;
+    readonly DAITAKU_HELIOS: 1065;
     readonly DAIWA_SCARLET: 1009;
     readonly EISHIN_FLASH: 1037;
     readonly EL_CONDOR_PASA: 1014;
