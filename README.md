@@ -16,3 +16,11 @@ Why use this over Hakuraku/uma.moe race sims?
 - uhhhhhhhhhhh
 - everything runs locally so you can bump up simulations to the high moon (they only allow 100 sims per run, you need probably 1,000-10,000 sims to get anything consistent)
 - randomly selects teams from the CM population that are actual team comps, so you can measure your performance across the field instead of against 2 teams
+
+## Credits
+
+Hakuraku for vague styling inspos and some data
+
+Uma Tools / Umalator for editor design and data and icons
+
+GlobalSim for making the actual simulator
