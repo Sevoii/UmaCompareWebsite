@@ -1570,3 +1570,250 @@ button.uc-ed-skill-main:hover span {
 .uc-strip-tip strong {
   color: var(--uc-text-primary);
 }
+
+/* ---- Skill optimizer page ---------------------------------------------------------------- */
+.uc-nav-link {
+  color: var(--uc-text-secondary);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.uc-nav-link:hover {
+  color: var(--uc-pink-light);
+}
+
+.uc-opt-uma {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 15px;
+  align-items: center;
+}
+
+.uc-opt-uma-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.uc-opt-hint {
+  margin: 10px 0 0;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+.uc-opt-suggest {
+  display: grid;
+  margin-top: 6px;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+}
+
+.uc-opt-suggest button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: var(--uc-text-primary);
+  text-align: left;
+}
+
+.uc-opt-suggest button:hover {
+  background: rgba(244, 114, 182, 0.1);
+}
+
+.uc-opt-suggest img,
+.uc-opt-chip img,
+.uc-opt-skill img {
+  width: 24px;
+  height: 24px;
+}
+
+.uc-opt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.uc-opt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 4px;
+  border: 1px solid var(--uc-border-accent);
+  border-radius: 999px;
+  background: var(--uc-bg-1);
+  font-size: 0.85rem;
+}
+
+.uc-opt-chip button {
+  border: 0;
+  background: none;
+  color: var(--uc-text-secondary);
+}
+
+.uc-opt-output {
+  min-height: 4rem;
+}
+
+.uc-opt-sources {
+  color: var(--uc-text-primary);
+  font-size: 0.85rem;
+}
+
+.uc-opt-sources span {
+  margin-left: 10px;
+  color: var(--uc-text-secondary);
+}
+
+.uc-opt-sources span:first-child {
+  margin-left: 0;
+}
+
+.uc-opt-progress {
+  height: 10px;
+  background: var(--uc-bg-3);
+}
+
+.uc-opt-progress .progress-bar {
+  background: var(--uc-pink);
+}
+
+.uc-opt-status {
+  margin: 6px 0 16px;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+}
+
+.uc-opt-heading {
+  margin: 20px 0 10px;
+  color: var(--uc-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.uc-opt-build {
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(75, 85, 99, 0.6);
+  border-radius: var(--uc-radius);
+  background: var(--uc-bg-1);
+}
+
+.uc-opt-build summary {
+  cursor: pointer;
+}
+
+.uc-opt-build summary small {
+  margin-left: 8px;
+  color: var(--uc-text-secondary);
+}
+
+.uc-opt-skills {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uc-opt-skill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uc-opt-skill span {
+  flex: 1;
+  min-width: 0;
+}
+
+.uc-opt-skill small {
+  min-width: 5.5rem;
+  color: var(--uc-text-secondary);
+  text-align: right;
+}
+
+.uc-opt-build-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.uc-opt-others,
+.uc-opt-prior {
+  margin-top: 12px;
+}
+
+.uc-opt-prior-scroll {
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.uc-opt-table {
+  --bs-table-bg: transparent;
+  font-size: 0.85rem;
+}
+
+.uc-opt-table th[data-sort] {
+  cursor: pointer;
+}
+
+@media (max-width: 575px) {
+  .uc-opt-uma {
+    grid-template-columns: 1fr;
+  }
+}
+
+.uc-opt-controls {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.uc-opt-advanced summary {
+  color: var(--uc-text-secondary);
+  cursor: pointer;
+}
+
+.uc-opt-advanced .row {
+  margin-top: 4px;
+}
+
+
+/* Optimizer: the uma editor embedded in the page (no dialog). */
+.uc-ed-inline {
+  padding: 0;
+  overflow: visible;
+}
+
+.uc-ed-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.uc-ed-inline-actions .uc-modal-error {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.uc-opt-build-uma {
+  margin: 10px 0;
+}
+
+.uc-opt-chip-own {
+  border-style: dashed;
+}
+
+.uc-opt-chip small {
+  color: var(--uc-text-secondary);
+}
+
+/* The suggestion boxes sit outside a modal, so [hidden] must beat display: grid explicitly. */
+.uc-opt-suggest[hidden] { display: none; }

@@ -170,7 +170,7 @@ function activatedSkills(metadata, horseCount) {
  * Race the tested team (slots 0-2) against the opponents (slots 3-8). Returns the tested
  * team's finish orders (0 = 1st), metres and seconds behind the winner, and activated skills.
  */
-async function runTrial(raceConditions, tested, opponents, seed, gates) {
+export async function runTrial(raceConditions, tested, opponents, seed, gates) {
   const race = buildRace(raceConditions).seed(seed);
   let slot = 0;
   [tested, ...opponents].forEach((team, t) => {
@@ -247,8 +247,8 @@ export function meanCi(values) {
  * has zero width when every difference is equal (e.g. neither team ever wins), so the
  * half-width adds one +1 and one -1 pseudo-observation.
  */
-export function pairedDifferenceCi(differences) {
-  return [fmean(differences), Z * stdev([...differences, 1, -1]) / Math.sqrt(differences.length)];
+export function pairedDifferenceCi(differences, z = Z) {
+  return [fmean(differences), z * stdev([...differences, 1, -1]) / Math.sqrt(differences.length)];
 }
 
 /** Wilson score interval for a proportion. */

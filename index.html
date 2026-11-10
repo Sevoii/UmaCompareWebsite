@@ -15,6 +15,7 @@
 <nav class="navbar uc-nav" data-bs-theme="dark">
     <div class="container">
         <span class="navbar-brand">Uma Compare</span>
+        <a class="uc-nav-link" href="./optimizer.html">Skill optimizer</a>
     </div>
 </nav>
 
@@ -190,10 +191,9 @@
 </dialog>
 
 <script type="module">
-    import {Course, Ground, RacePreset, Season, Time, Weather, trackLabel} from './globalsim/index.js';
-    import {
-        CM_NAMES, TEAM_SIZE, Tally, cmFromNumber, drawTrials, loadTeam, raceFromMeeting, report, teamLabel,
-    } from './compare.js';
+    import {Course} from './globalsim/index.js';
+    import {TEAM_SIZE, Tally, drawTrials, loadTeam, report, teamLabel} from './compare.js';
+    import {createRaceControls} from './race-controls.js';
     import {Roster, canonicalJson, hashOf} from './roster.js';
     import {validateTeamMembers} from './team-rules.js';
     import {renderResults} from './results.js';
@@ -218,85 +218,9 @@
     // ---- Race conditions ----
     // A preset (Champions Meeting) fills in the course and conditions; any of them can then be
     // changed, which turns the preset into "Custom" (or into a meeting whose conditions match).
-    const MEETINGS = CM_NAMES.map((_, i) => CM_NAMES.length - i); // newest first
-    const meetingRace = new Map(MEETINGS.map((n) => [n, raceFromMeeting(cmFromNumber(n))]));
-    // Racecourses without a name aren't in Global (umalator leaves them out too).
-    const COURSES = Course.all().filter((c) => !/^Track \d+$/.test(trackLabel(c.track)));
-    const CONDITIONS = {raceGround: Ground, raceWeather: Weather, raceSeason: Season, raceTime: Time};
-
-    $('racePreset').add(new Option('Custom', ''));
-    for (const number of MEETINGS) {
-        const preset = RacePreset.championsMeeting(cmFromNumber(number));
-        $('racePreset').add(new Option(`CM${number}: ${preset.name} (${preset.date}), ${preset.course}`, String(number)));
-    }
-    for (const track of [...new Set(COURSES.map((c) => c.track))]) $('raceTrack').add(new Option(trackLabel(track), String(track)));
-    for (const [id, values] of Object.entries(CONDITIONS)) {
-        for (const value of Object.values(values)) $(id).add(new Option(value, value));
-    }
-
-    /** Fill the Course list for a racecourse, keeping a course with the same surface and distance if there is one. */
-    function fillCourses(track, keep = null) {
-        const select = $('raceCourse');
-        select.innerHTML = '';
-        const prefix = `${trackLabel(track)} `;
-        const courses = COURSES.filter((c) => c.track === track)
-            .sort((a, b) => a.surface - b.surface || a.distance - b.distance || a.layout - b.layout);
-        for (const course of courses) select.add(new Option(String(course).replace(prefix, ''), String(course.id)));
-        const same = keep && courses.find((c) => c.surface === keep.surface && c.distance === keep.distance);
-        if (same) select.value = String(same.id);
-    }
-
-    /** The race conditions the controls describe (with the meeting's name if they are exactly a meeting's). */
-    function currentRace() {
-        const race = {
-            courseId: Number($('raceCourse').value), ground: $('raceGround').value, weather: $('raceWeather').value,
-            season: $('raceSeason').value, time: $('raceTime').value, preset: null,
-        };
-        const meeting = meetingRace.get(Number($('racePreset').value));
-        if (meeting && ['courseId', 'ground', 'weather', 'season', 'time'].every((k) => meeting[k] === race[k])) {
-            race.preset = meeting.preset;
-        }
-        return race;
-    }
-    const currentCourse = () => Course.get(Number($('raceCourse').value));
-
-    function applyRace(race) {
-        const course = Course.get(race.courseId);
-        $('raceTrack').value = String(course.track);
-        fillCourses(course.track);
-        $('raceCourse').value = String(course.id);
-        $('raceGround').value = race.ground;
-        $('raceWeather').value = race.weather;
-        $('raceSeason').value = race.season;
-        $('raceTime').value = race.time;
-    }
-
-    function selectMeeting(number) {
-        $('racePreset').value = String(number);
-        applyRace(meetingRace.get(number));
-        lastRun = null;
-    }
-
-    /** After a manual change: show the meeting these conditions match, or "Custom". */
-    function syncPreset() {
-        const race = currentRace();
-        const match = MEETINGS.find((n) => {
-            const m = meetingRace.get(n);
-            return ['courseId', 'ground', 'weather', 'season', 'time'].every((k) => m[k] === race[k]);
-        });
-        $('racePreset').value = match ? String(match) : '';
-        lastRun = null;
-    }
-
-    $('racePreset').addEventListener('change', () => {
-        if ($('racePreset').value) selectMeeting(Number($('racePreset').value));
+    const {currentRace, currentCourse, selectMeeting} = createRaceControls({
+        onChange: () => { lastRun = null; },
     });
-    $('raceTrack').addEventListener('change', () => {
-        fillCourses(Number($('raceTrack').value), currentCourse());
-        syncPreset();
-    });
-    for (const id of ['raceCourse', ...Object.keys(CONDITIONS)]) $(id).addEventListener('change', syncPreset);
-    selectMeeting(MEETINGS[0]);
 
     const manifest = await (await fetch('./pools/index.json')).json();
     for (const entry of manifest) $('pool').add(new Option(entry.label, entry.file));

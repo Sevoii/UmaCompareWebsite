@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Uma Compare - Skill optimizer</title>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+          referrerpolicy="no-referrer"
+          crossorigin="anonymous">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<nav class="navbar uc-nav" data-bs-theme="dark">
+    <div class="container">
+        <span class="navbar-brand">Uma Compare</span>
+        <a class="uc-nav-link" href="./index.html">Team comparison</a>
+    </div>
+</nav>
+
+<main class="container">
+    <header class="page-header">
+        <h1>Skill optimizer</h1>
+        <p class="page-subtitle">Finds the best set of skills to buy for one uma. Candidate builds are raced inside
+            representative teams against opponents from a pool, generation after generation, keeping what works.
+            Every build in a generation races the same trials, so differences come down to the skills.
+        </p>
+    </header>
+
+    <!-- Disabled as a whole while a run is preparing or running. -->
+    <fieldset id="controls" class="uc-opt-controls">
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="uc-section-title">Race</h2>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label" for="racePreset">Preset</label>
+                    <select class="form-select" id="racePreset"></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="raceTrack">Racecourse</label>
+                    <select class="form-select" id="raceTrack"></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="raceCourse">Course</label>
+                    <select class="form-select" id="raceCourse"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceGround">Ground</label>
+                    <select class="form-select" id="raceGround"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceWeather">Weather</label>
+                    <select class="form-select" id="raceWeather"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceSeason">Season</label>
+                    <select class="form-select" id="raceSeason"></select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="raceTime">Time of day</label>
+                    <select class="form-select" id="raceTime"></select>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="uc-section-title">Uma</h2>
+            <div class="uc-opt-uma-editor" id="umaEditorInline"></div>
+            <p class="uc-opt-hint">Stats, aptitudes, running style, costume and the unique skill (with its level) are
+                used as entered. The optimizer chooses every other skill. This uma is kept on this page only, not in
+                your saved umas.</p>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="uc-section-title">Search</h2>
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="budget">SP budget</label>
+                    <input class="form-control" type="number" id="budget" value="3000" min="0" step="10">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="discount">Hint discount %</label>
+                    <input class="form-control" type="number" id="discount" value="0" min="0" max="40" step="5">
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="metric">Score</label>
+                    <select class="form-select" id="metric">
+                        <option value="place" selected>Average place (lower is better)</option>
+                        <option value="teamWin">Team win rate</option>
+                        <option value="umaWin">Uma win rate</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="inheritedSearch">Inherited uniques the uma has</label>
+                    <input class="form-control" type="search" id="inheritedSearch" autocomplete="off"
+                           placeholder="Search inherited unique skills to add">
+                    <div class="uc-opt-suggest" id="inheritedResults" hidden></div>
+                    <div class="uc-opt-chips" id="inheritedChips"></div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="goldSearch">Available gold skills</label>
+                    <input class="form-control" type="search" id="goldSearch" autocomplete="off"
+                           placeholder="Search gold skills to add">
+                    <div class="uc-opt-suggest" id="goldResults" hidden></div>
+                    <div class="uc-opt-chips" id="goldChips"></div>
+                    <p class="uc-opt-hint">Golds from your support cards' events and the scenario. The uma's own golds are
+                        included automatically. Whites are always available.</p>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="blacklistSearch">Skill blacklist</label>
+                    <input class="form-control" type="search" id="blacklistSearch" autocomplete="off" placeholder="Search skills to exclude">
+                    <div class="uc-opt-suggest" id="blacklistResults" hidden></div>
+                    <div class="uc-opt-chips" id="blacklistChips"></div>
+                    <p class="uc-opt-hint">Excluded from generated builds, including Hakuraku-derived builds.</p>
+                </div>
+                <div class="col-12" id="snapshotRow" hidden>
+                    <label class="form-label" for="snapshot">hakuraku snapshot (custom race)</label>
+                    <select class="form-select" id="snapshot"></select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="archetype">Team archetype</label>
+                    <select class="form-select" id="archetype"></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="slot">Slot the uma fills</label>
+                    <select class="form-select" id="slot"></select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="pool">Opponent pool</label>
+                    <select class="form-select" id="pool"></select>
+                    <div class="alert alert-warning uc-opt-warning mt-2 mb-0" id="poolWarning" hidden></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="population">Population</label>
+                    <input class="form-control" type="number" id="population" value="64" min="2" step="1">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="trials">Trials per build</label>
+                    <input class="form-control" type="number" id="trials" value="200" min="2" step="10">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="generations">Max generations</label>
+                    <input class="form-control" type="number" id="generations" value="12" min="1" step="1">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="elite">Elite fraction</label>
+                    <input class="form-control" type="number" id="elite" value="0.2" min="0.05" max="0.9" step="0.05">
+                </div>
+                <div class="col-12">
+                    <details class="uc-opt-advanced">
+                        <summary>Advanced</summary>
+                        <div class="row g-3 mt-0" id="advancedFields"></div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </section>
+    </fieldset>
+
+    <div class="d-flex gap-2 justify-content-end mb-4">
+        <button class="btn btn-outline-light px-4" id="stop" disabled>Stop</button>
+        <button class="btn btn-outline-pink px-4" id="resume" disabled>Resume</button>
+        <button class="btn btn-pink px-4" id="optimize" disabled>Optimize</button>
+    </div>
+    <p class="uc-opt-hint text-end">Resume runs another set of generations using the previous run's inputs. Available until this page is reloaded or a new optimization starts.</p>
+
+    <div class="uc-opt-output" id="output" aria-live="polite"></div>
+</main>
+
+<footer class="uc-footer">
+    <div class="container">Simulated with GlobalSim.</div>
+</footer>
+
+<script type="module" src="./optimizer.js"></script>
+</body>
+</html>

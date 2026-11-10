@@ -32,8 +32,10 @@ export function umasFromFile(json) {
  * Wire the modal. Clicking an uma shows a preview of it; "Use this uma" there runs
  * `onSelect(target, umaId)` (target is whatever was passed to open(), e.g. { slot, index }) and
  * closes the modal. "New uma" closes the modal and runs `onNew(target)`. Returns { open(target) }.
+ * With `direct: true`, clicking an uma selects it at once (no preview). Without `onNew` the
+ * "New uma" button is hidden; without `onEdit` the cards have no edit button.
  */
-export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
+export function createUmaPicker({ roster, onSelect, onNew, onEdit, direct = false }) {
   const $ = (id) => document.getElementById(id);
   const dialog = $('umaPicker');
   const list = $('umaPickerList');
@@ -47,6 +49,8 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
   const previewFooter = $('umaPickerPreviewFooter');
   const backArrow = $('umaPickerBack');
   backArrow.innerHTML = ICONS.arrowLeft;
+  const newButton = $('umaPickerNew');
+  newButton.hidden = !onNew;
   let target = null;
   let previewing = null; // id of the uma being previewed, or null on the list
   let listScroll = 0;
@@ -90,7 +94,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
       <footer class="uc-uma-card-footer">
         <span class="uc-uma-card-usage">${teams ? `In ${teams} saved team${teams === 1 ? '' : 's'}` : ''}</span>
         <span class="uc-uma-card-actions">
-          <button type="button" class="uc-icon-button" data-action="edit" title="Edit" aria-label="Edit ${name}">${ICONS.pencil}</button>
+          ${onEdit ? `<button type="button" class="uc-icon-button" data-action="edit" title="Edit" aria-label="Edit ${name}">${ICONS.pencil}</button>` : ''}
           <button type="button" class="uc-icon-button uc-star" data-action="favorite" aria-pressed="${Boolean(uma.favorite)}"
             title="${favoriteLabel}" aria-label="${favoriteLabel} ${name}">${ICONS.starOutline}${ICONS.starFill}</button>
           <button type="button" class="uc-icon-button uc-delete" data-action="delete" title="Delete" aria-label="Delete ${name}">${ICONS.trash}</button>
@@ -136,7 +140,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
     listScroll = list.scrollTop;
     preview.innerHTML = umaPreviewHtml(uma.data, uma.name);
     $('umaPickerTitle').textContent = umaDisplayName(uma.data, uma.name);
-    for (const el of [searchArea, list, $('umaPickerNew'), $('umaPickerImport')]) el.hidden = true;
+    for (const el of [searchArea, list, newButton, $('umaPickerImport')]) el.hidden = true;
     for (const el of [preview, previewFooter, backArrow]) el.hidden = false;
     preview.scrollTop = 0;
     $('umaPickerSelect').focus();
@@ -147,7 +151,8 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
     previewing = null;
     $('umaPickerTitle').textContent = 'Saved Umas';
     for (const el of [preview, previewFooter, backArrow]) el.hidden = true;
-    for (const el of [searchArea, list, $('umaPickerNew'), $('umaPickerImport')]) el.hidden = false;
+    for (const el of [searchArea, list, $('umaPickerImport')]) el.hidden = false;
+    newButton.hidden = !onNew;
     render();
     list.scrollTop = listScroll;
   }
@@ -171,7 +176,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
     }
   });
 
-  $('umaPickerNew').addEventListener('click', () => {
+  newButton.addEventListener('click', () => {
     dialog.close();
     onNew?.(target);
   });
@@ -186,7 +191,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
     showError(null);
     try {
       if (!button) {
-        showPreview(id); // a click anywhere else on the card
+        if (direct) select(id); else showPreview(id); // a click anywhere else on the card
       } else if (button.dataset.action === 'favorite') {
         roster.toggleFavoriteUma(id);
       } else if (button.dataset.action === 'edit') {
@@ -210,7 +215,7 @@ export function createUmaPicker({ roster, onSelect, onNew, onEdit }) {
   list.addEventListener('keydown', (event) => {
     if ((event.key === 'Enter' || event.key === ' ') && event.target.classList?.contains('uc-uma-card')) {
       event.preventDefault();
-      showPreview(event.target.dataset.id);
+      if (direct) select(event.target.dataset.id); else showPreview(event.target.dataset.id);
     }
   });
 

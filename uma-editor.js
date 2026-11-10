@@ -141,9 +141,24 @@ function defaultUnique(charaId) {
   return own.find((id) => id[1] === '0') ?? own[0] ?? null;
 }
 
-export function createUmaEditor({ onConfirm, onClose }) {
-  const dialog = document.getElementById('umaEditor');
-  dialog.addEventListener('close', () => onClose?.(target));
+/** A draft for the inline editor: a copy of `data` with only its unique skill kept. */
+const inlineDraft = (data) => {
+  const draft = structuredClone(data);
+  draft.skills = (Array.isArray(draft.skills) ? draft.skills : []).filter((s) => s.isUnique);
+  return draft;
+};
+
+/**
+ * The editor. By default it is the modal on <dialog id="umaEditor"> (`open(...)`, confirm / cancel).
+ * With `inline` (an element) it is embedded there instead: no dialog, header, nickname, Save /
+ * Cancel or prompts, and only the unique skill (the optimizer picks the rest). Every change calls
+ * `onChange(draft, error)` (a copy of the draft, and why it isn't valid yet, or null); drive it
+ * with `set`, `get`, `validate` and `setCourse`. See `createUmaInlineEditor`.
+ */
+export function createUmaEditor({ onConfirm, onClose, inline = null, onChange }) {
+  const dialog = inline ?? document.getElementById('umaEditor');
+  if (!inline) dialog.addEventListener('close', () => onClose?.(target));
+  let silent = false; // set() renders without reporting a change
   let draft = null; // runner JSON being edited
   let nickname = '';
   let target = null;
@@ -205,13 +220,21 @@ export function createUmaEditor({ onConfirm, onClose }) {
       </li>`;
   }
 
+  /** Inline mode: report the draft (and why it isn't valid yet) after every change. */
+  function emit() {
+    if (!inline || silent) return;
+    const { error } = validate();
+    showError(error);
+    onChange?.(structuredClone(draft), error);
+  }
+
   function render() {
     const charaName = charaNameOf(draft.charaId);
     const outfit = outfitOf(draft);
     const charaLabel = outfit ? `${outfit.epithet} ${charaName}` : charaName;
     const unique = uniqueEntry();
     const others = skillsOf().filter((s) => !s.isUnique);
-    dialog.innerHTML = `
+    dialog.innerHTML = inline ? inlineHtml(charaLabel, unique) : `
       <header class="uc-modal-header">
         <h2 id="umaEditorTitle">${isNew ? 'New Uma' : 'Edit Uma'}</h2>
         <span class="uc-unsaved-dot uc-ed-dirty" title="Unsaved changes" aria-label="Unsaved changes" hidden></span>
@@ -289,6 +312,67 @@ export function createUmaEditor({ onConfirm, onClose }) {
       </footer>`;
     if (picker) renderPickerList();
     updateDirtyDot();
+    emit();
+  }
+
+  /** The inline layout: the same sections as the modal, minus nickname, extra skills and the footer buttons. */
+  function inlineHtml(charaLabel, unique) {
+    return `
+      <div class="uc-ed-body uc-ed-inline">
+        <section class="uc-ed-top">
+          ${draft.charaId == null
+            ? '<div class="uc-ed-portrait uc-ed-portrait-empty" aria-hidden="true">?</div>'
+            : `<img class="uc-ed-portrait" src="${portraitUrl(draft)}" alt="" onerror="this.style.visibility='hidden'">`}
+          <div class="uc-ed-identity">
+            <label class="form-label" for="umaEditorChara">Character</label>
+            <div class="uc-ed-combo">
+              <input type="text" class="form-control" id="umaEditorChara" value="${escapeHtml(charaLabel)}" autocomplete="off"
+                placeholder="Search for a character"
+                role="combobox" aria-expanded="false" aria-controls="umaEditorCharaList">
+              <ul class="uc-ed-combo-list" id="umaEditorCharaList" role="listbox" hidden></ul>
+            </div>
+          </div>
+        </section>
+        <section class="uc-ed-stats">
+          ${STATS.map(([, label, icon]) => `<div class="uc-ed-stat-head"><img src="./assets/stats/${icon}.webp" alt="">${label}</div>`).join('')}
+          ${STATS.map(([field, label]) => `<div class="uc-ed-stat">
+              ${statRankImg(field, draft[field])}
+              <input type="number" class="form-control" min="1" max="${STAT_MAX}" step="1" value="${escapeHtml(draft[field] ?? '')}"
+                data-stat="${field}" aria-label="${label}">
+            </div>`).join('')}
+        </section>
+        <section class="uc-ed-apts">
+          ${aptitudeButton('surfaceAptitude', 'Surface aptitude')}
+          ${aptitudeButton('distanceAptitude', 'Distance aptitude')}
+          <div class="uc-ed-apt">
+            <span>Style</span>
+            <select class="form-select form-select-sm" data-action="strategy" aria-label="Style">
+              ${Object.values(Strategy).map((s) => `<option value="${s}"${s === draft.strategy ? ' selected' : ''}>${strategyName(s)}</option>`).join('')}
+            </select>
+          </div>
+          ${aptitudeButton('strategyAptitude', 'Style aptitude')}
+        </section>
+        <section>
+          <div class="uc-ed-skills-head">Unique skill</div>
+          <ul class="uc-ed-skills">
+            ${unique ? skillRow(unique) : `<li class="uc-ed-skill"><button type="button" class="uc-ed-add-skill" data-action="open-unique"><span>+</span>Set unique skill</button></li>`}
+          </ul>
+        </section>
+        <div class="uc-ed-picker" ${picker ? '' : 'hidden'}>
+          <div class="uc-ed-picker-head">
+            <strong>Choose unique skill</strong>
+            <input type="search" class="form-control form-control-sm" id="umaEditorSkillSearch" placeholder="Search skills" aria-label="Search skills">
+            <button type="button" class="btn-close" data-action="close-picker" aria-label="Close skill picker"></button>
+          </div>
+          <ul class="uc-ed-picker-list" id="umaEditorSkillList"></ul>
+        </div>
+        <div class="uc-ed-inline-actions">
+          <button type="button" class="btn btn-sm btn-outline-light" data-action="export">Export</button>
+          <button type="button" class="btn btn-sm btn-outline-light" data-action="import">Import</button>
+          <input type="file" accept=".json,application/json" data-action="import-file" hidden>
+          <p class="uc-modal-error" id="umaEditorError" role="alert" hidden></p>
+        </div>
+      </div>`;
   }
 
   function renderPickerList() {
@@ -367,7 +451,7 @@ export function createUmaEditor({ onConfirm, onClose }) {
   dialog.addEventListener('mousedown', (event) => { pressedOnBackdrop = event.target === dialog; });
 
   dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) {
+    if (event.target === dialog && !inline) {
       if (pressedOnBackdrop) requestClose();
       pressedOnBackdrop = false;
       return;
@@ -414,6 +498,7 @@ export function createUmaEditor({ onConfirm, onClose }) {
         break;
       }
       case 'export': exportUma(); break;
+      case 'import': dialog.querySelector('[data-action=import-file]')?.click(); break;
       case 'confirm': confirm(); break;
       case 'confirm-copy': confirm(true); break;
     }
@@ -428,6 +513,7 @@ export function createUmaEditor({ onConfirm, onClose }) {
       glyph.src = statRankUrl(draft[field]);
       glyph.style.visibility = draft[field] === '' ? 'hidden' : '';
       updateDirtyDot();
+      emit();
     } else if (el.id === 'umaEditorNickname') {
       nickname = el.value;
       updateDirtyDot();
@@ -443,7 +529,9 @@ export function createUmaEditor({ onConfirm, onClose }) {
     const el = event.target;
     if (el.dataset.action === 'strategy') draft.strategy = el.value;
     if (el.dataset.action === 'unique-level') uniqueEntry().level = Number(el.value);
+    if (el.dataset.action === 'import-file') { importFile(el); return; }
     updateDirtyDot();
+    emit();
   });
 
   // Character combobox: open on focus, pick with click or Enter/arrow keys.
@@ -482,7 +570,7 @@ export function createUmaEditor({ onConfirm, onClose }) {
       event.preventDefault();
       event.stopPropagation();
       if (picker) { picker = null; render(); } else closeAptMenus();
-    } else if (event.key === 'Escape' && !charOpen) {
+    } else if (event.key === 'Escape' && !charOpen && !inline) {
       // Nothing open inside: close the editor, asking first if there are changes. Done here
       // rather than only via the cancel event, which browsers don't always let us stop.
       event.preventDefault();
@@ -518,6 +606,31 @@ export function createUmaEditor({ onConfirm, onClose }) {
     return data;
   }
 
+  /** { data, error }: the draft as runner JSON, or why it isn't valid. */
+  function validate() {
+    try { return { data: validated(), error: null }; } catch (error) { return { data: null, error: error.message }; }
+  }
+
+  /** Inline: load a single uma (a runner, a list of runners or a team file; the first uma) from a JSON file. */
+  async function importFile(input) {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const json = JSON.parse(await file.text());
+      // A run may have started (and disabled the editor) while the file was being read.
+      if (inline && dialog.closest('fieldset')?.disabled) throw new Error('the optimizer is running; import again when it stops');
+      const runner = Array.isArray(json) ? json[0] : Array.isArray(json?.members) ? json.members[0] : json;
+      if (!runner || typeof runner !== 'object') throw new Error('no uma in this file');
+      UmaBuilder.fromJson(structuredClone(runner));
+      draft = inlineDraft(runner);
+      picker = null;
+      render();
+    } catch (error) {
+      showError(`Import failed: ${error.message}`);
+    }
+  }
+
   function exportUma() {
     let data;
     try { data = validated(); } catch (error) { showError(error.message); return; }
@@ -551,6 +664,22 @@ export function createUmaEditor({ onConfirm, onClose }) {
   }
 
   return {
+    /** Inline: replace the draft and report the resulting state once. Only the unique skill is kept. */
+    set(data) {
+      silent = true;
+      draft = inlineDraft(data);
+      picker = null;
+      charOpen = false;
+      render();
+      silent = false;
+      emit();
+    },
+    /** Inline: a copy of the current draft. */
+    get: () => structuredClone(draft),
+    /** Inline: { data, error } for the current draft. */
+    validate,
+    /** Set the course ({ surface, category }) that a newly chosen character's aptitude defaults follow. */
+    setCourse(raceCourse) { course = raceCourse; },
     /**
      * Edit a copy of `data` (runner JSON). `openTarget` is passed back to onConfirm.
      * `raceCourse` ({ surface, category }) picks which aptitudes a new character's defaults fill in.
@@ -571,4 +700,17 @@ export function createUmaEditor({ onConfirm, onClose }) {
       dialog.focus();
     },
   };
+}
+
+/**
+ * An uma editor embedded in `container` (no modal): character / costume, stats, aptitudes, style
+ * and unique skill. `onChange(draft, error)` runs after every user change. Returns
+ * { set(draft), get(), validate() -> { data, error }, setCourse(course) }.
+ * @param {{container: HTMLElement, onChange?: (draft: object, error: string|null) => void, draft?: object, course?: object}} options
+ */
+export function createUmaInlineEditor({ container, onChange, draft = newUmaDraft(), course = null }) {
+  const editor = createUmaEditor({ inline: container, onChange });
+  editor.setCourse(course);
+  editor.set(draft);
+  return editor;
 }
