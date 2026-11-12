@@ -783,6 +783,7 @@
             // (and edits change a box's team in place), but the results belong to what was raced.
             const tested = slots.map((slot) => structuredClone(teams[slot].team));
             const testedNames = slots.map((slot) => teams[slot].name ?? slotLabel(slot));
+            const poolLabel = $('pool').selectedOptions[0]?.label ?? null;
             tested.forEach((team) => validateTeamMembers(team.members));
             // Leave the tested teams out of the opponents, matched by id or by identical members.
             const testedIds = new Set(tested.map((team) => team.id));
@@ -810,7 +811,7 @@
             const courseDistance = Course.get(race.courseId).distance;
             const tallies = tested.map((team, i) => new Tally(team, testedNames[i], {courseDistance}));
             for (const perTeam of results) perTeam.forEach((result, i) => tallies[i].add(result));
-            lastRun = {race, n, poolSize: pool.length, tallies, labels: slots.map(slotLabel)};
+            lastRun = {race, n, poolSize: pool.length, poolLabel, tallies, labels: slots.map(slotLabel)};
             console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);
             renderResults(output, {...lastRun, compact: $('compact').checked});
         } catch (error) {

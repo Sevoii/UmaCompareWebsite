@@ -154,6 +154,20 @@ body {
 .uc-result-bar { height: 7px; background: var(--uc-bg-3); margin: 8px 24px 12px; border-radius: 8px; overflow: hidden; }
 .uc-result-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #be508e, var(--uc-pink-light)); border-radius: inherit; }
 .uc-result-rate-note { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 0 24px 24px; font-size: .72rem; color: var(--uc-text-secondary); }
+.uc-results-heading-side { display: flex; align-items: center; gap: 16px; }
+/* A team card's members: a summary row (names) that collapses the runner sections. */
+.uc-result-members > summary {
+  display: flex; align-items: baseline; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--uc-border);
+  cursor: pointer; list-style: none; font-size: .8rem; color: var(--uc-pink-light);
+}
+.uc-result-members > summary::-webkit-details-marker { display: none; }
+.uc-result-members > summary::before { content: '▸'; transition: transform .15s; }
+.uc-result-members[open] > summary::before { transform: rotate(90deg); }
+.uc-result-members > summary > span { white-space: nowrap; }
+.uc-result-members > summary > small {
+  color: var(--uc-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.uc-result-members > summary:hover > span, .uc-result-members > summary:focus-visible > span { text-decoration: underline; }
 .uc-result-runner { border-top: 1px solid var(--uc-border); padding: 18px 24px; }
 .uc-result-runner-heading { display: flex; align-items: center; gap: 12px; }
 .uc-result-runner-heading img { width: 48px; height: 54px; object-fit: contain; }
@@ -183,7 +197,8 @@ body {
 @media (max-width: 576px) {
   .uc-results-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .uc-results-heading p { text-align: left; }
-  .uc-result-team > header, .uc-result-runner { padding-left: 16px; padding-right: 16px; }
+  .uc-results-heading-side { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .uc-result-team > header, .uc-result-runner, .uc-result-members > summary { padding-left: 16px; padding-right: 16px; }
   .uc-result-badge { white-space: normal; }
   .uc-result-metrics > div { padding: 8px; }
   .uc-result-metrics strong { font-size: .9rem; }

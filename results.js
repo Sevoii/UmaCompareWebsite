@@ -1,4 +1,6 @@
-import { raceLabel, memberName, strategyName, meanCi, pairedDifferenceCi, wilsonCi } from './compare.js';
+import {
+  CONFIDENCE, raceLabel, memberName, strategyName, meanCi, pairedDifferenceCi, wilsonCi, winRateDifference,
+} from './compare.js';
 import { skillLabel } from './globalsim/index.js';
 import { escapeHtml as esc, portraitUrl } from './team-picker.js';
 import { skillIconUrl } from './uma-editor.js';
@@ -12,6 +14,67 @@ const metric = (values, unit = '') => {
 
 // The pair of teams the comparison panel shows, per results container (kept across re-renders).
 const chosenPairs = new WeakMap();
+// Indices of the team cards whose members are collapsed, per run (its tallies array), so the
+// "Collapse skill details" re-render keeps them collapsed and a new run starts expanded.
+const collapsedTeams = new WeakMap();
+
+// ---- JSON export ----
+const interval = ([mean, half]) => ({ mean, low: mean - half, high: mean + half });
+
+/**
+ * A finished comparison as plain JSON: the race, and per team its win rate (Wilson CI), each
+ * runner's averages (normal CIs), skill activation rates and runner JSON, then the paired
+ * win-rate difference of every pair of teams. Rates and differences are fractions.
+ */
+export function resultsJson({ race, n, poolSize, poolLabel = null, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`) }) {
+  const pairs = [];
+  for (let i = 0; i < tallies.length; i++) {
+    for (let j = i + 1; j < tallies.length; j++) {
+      const { difference, low, high } = winRateDifference(tallies[i], tallies[j]);
+      pairs.push({ teams: [i, j], names: [tallies[i].name, tallies[j].name], difference, low, high });
+    }
+  }
+  return {
+    exportedAt: new Date().toISOString(),
+    confidence: CONFIDENCE,
+    race: { ...race, label: raceLabel(race) },
+    trials: n,
+    opponentPool: { label: poolLabel, teams: poolSize },
+    teams: tallies.map((t, i) => {
+      const [low, high] = wilsonCi(t.winCount, n);
+      return {
+        label: labels[i],
+        name: t.name,
+        wins: t.winCount,
+        winRate: { mean: t.winCount / n, low, high },
+        members: t.team.members.map((member, k) => ({
+          name: memberName(t.team, k),
+          strategy: strategyName(member.strategy),
+          averagePlace: interval(meanCi(t.places[k])),
+          metresBehindWinner: interval(meanCi(t.distances[k])),
+          secondsBehindWinner: interval(meanCi(t.times[k])),
+          skills: (member.skills ?? []).map((s) => {
+            const id = String(typeof s === 'object' ? s.skillId : s);
+            return { skillId: id, name: skillLabel(Number(id)), activationRate: (t.skillProcs[k].get(id) ?? 0) / n };
+          }),
+          runner: member,
+        })),
+      };
+    }),
+    pairedWinRateDifferences: pairs,
+  };
+}
+
+/** Download the results JSON of a run. */
+function downloadResults(run) {
+  const slug = raceLabel(run.race).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'race';
+  const url = URL.createObjectURL(new Blob([JSON.stringify(resultsJson(run), null, 2)], { type: 'application/json' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: `uma-compare-${slug}-${run.n}-trials.json` });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000); // revoking at once can cancel the download
+}
 
 // ---- where skills activate (per uma), drawn like hakuraku's "Simulator activation positions" ----
 // Race phases as fractions of the course: Middle from 1/6, Late from 2/3, Spurt from 5/6.
@@ -77,8 +140,11 @@ function pairHtml(tallies, labels, i, j) {
  * and shows their paired win-rate difference with its confidence interval (no re-run needed).
  * `labels` names each team's position ("Team 1", ...).
  */
-export function renderResults(container, { race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact }) {
+export function renderResults(container, run) {
+  const { race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact } = run;
   const best = Math.max(...tallies.map((t) => t.winCount));
+  if (!collapsedTeams.has(tallies)) collapsedTeams.set(tallies, new Set());
+  const collapsed = collapsedTeams.get(tallies);
   let [pairA, pairB] = chosenPairs.get(container) ?? [0, 1];
   if (!tallies[pairA] || !tallies[pairB]) [pairA, pairB] = [0, 1];
   const option = (i, selected) => `<option value="${i}"${i === selected ? ' selected' : ''}>${esc(labels[i])}: ${esc(tallies[i].name)}</option>`;
@@ -93,7 +159,8 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
       <div class="uc-result-pair-body">${pairHtml(tallies, labels, pairA, pairB)}</div>
     </article>`;
   container.innerHTML = `<div class="uc-results-heading"><div><span class="uc-result-eyebrow">Comparison complete</span>
-    <h2>${esc(raceLabel(race))}</h2></div><p>${n.toLocaleString()} trials · ${poolSize.toLocaleString()} opponent teams<br><span>95% confidence intervals · identical race conditions</span></p></div>
+    <h2>${esc(raceLabel(race))}</h2></div><div class="uc-results-heading-side"><p>${n.toLocaleString()} trials · ${poolSize.toLocaleString()} opponent teams<br><span>95% confidence intervals · identical race conditions</span></p>
+    <button type="button" class="btn btn-sm btn-outline-pink" data-action="export-results" title="Download these results as JSON">Export JSON</button></div></div>
     <div class="uc-result-teams">${tallies.map((t, i) => {
       const [low, high] = wilsonCi(t.winCount, n);
       return `<article class="uc-result-team"><header><div><span class="uc-result-eyebrow">${esc(labels[i])}</span><h3>${esc(t.name)}</h3></div>
@@ -101,6 +168,8 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
         <div class="uc-result-rate">${pct(t.winCount / n)}<span>team win rate</span></div>
         <div class="uc-result-bar" role="img" aria-label="Win rate ${pct(t.winCount / n)}"><span style="width:${100 * t.winCount / n}%"></span></div>
         <div class="uc-result-rate-note"><span>${t.winCount.toLocaleString()} wins / ${n.toLocaleString()} trials</span><span>95% CI: [${pct(low)}, ${pct(high)}]</span></div>
+        <details class="uc-result-members" data-team="${i}"${collapsed.has(i) ? '' : ' open'}>
+        <summary><span>Team members</span><small>${t.team.members.map((_, k) => esc(memberName(t.team, k))).join(' · ')}</small></summary>
         <div class="uc-result-runners">${t.team.members.map((m, k) => `<section class="uc-result-runner">
           <div class="uc-result-runner-heading"><img src="${portraitUrl(m)}" alt="" onerror="this.style.visibility='hidden'"><div><h4>${esc(memberName(t.team, k))}</h4><span>${esc(strategyName(m.strategy))}</span></div></div>
           <div class="uc-result-metrics"><div><span>Average place</span>${metric(t.places[k])}</div><div><span>Behind winner</span>${metric(t.distances[k], ' m')}</div><div><span>Finish gap</span>${metric(t.times[k], ' s')}</div></div>
@@ -115,7 +184,7 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
               return `<li><img src="${skillIconUrl(id)}" alt=""><span>${esc(skillLabel(Number(id)))}${s.isUnique ? ` <small>Lv ${esc(s.level)}</small>` : ''}</span><strong>${pct(rate)}</strong>${strip}</li>`;
             }).join('')}</ul><small>Activation rate = races where the skill activated at least once.${t.binCount
               ? ` The strip shows where on the course it activated (${t.binSize} m bins, brighter = more often); hover it for details.` : ''}</small>
-          </details></section>`).join('')}</div></article>`;
+          </details></section>`).join('')}</div></details></article>`;
     }).join('')}</div><div class="uc-result-pairs">${pairPanel}</div>`;
 
   // Changing either team updates just the comparison panel.
@@ -127,6 +196,15 @@ export function renderResults(container, { race, n, poolSize, tallies, labels = 
     });
   }
   chosenPairs.set(container, [pairA, pairB]);
+
+  // Collapsing / expanding a team's members is remembered for this run's re-renders.
+  for (const details of container.querySelectorAll('.uc-result-members')) {
+    details.addEventListener('toggle', () => {
+      const i = Number(details.dataset.team);
+      if (details.open) collapsed.delete(i); else collapsed.add(i);
+    });
+  }
+  container.querySelector('[data-action="export-results"]').addEventListener('click', () => downloadResults(run));
 
   // Hovering an activation strip shows that bin's numbers in a small tooltip.
   const tip = document.createElement('div');
