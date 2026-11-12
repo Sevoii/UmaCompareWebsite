@@ -1,32 +1,24 @@
-# Uma Compare Website
+# Uma Sim
 
-Website Link: https://sevoii.github.io/UmaCompareWebsite/
+Website Link: https://sevoii.github.io/UmaSimWebsite/
 
-Web port of my other tool [Uma Sim](https://github.com/Sevoii/UmaSim) (Name TBD).
+This is a collection of various tools I've made using my WASM port of [Global Sim](https://github.com/Sevoii/GlobalSim). 
 
-Uses WASM port of [Global Sim](https://github.com/Sevoii/GlobalSim)
+## Room Match Simulator
 
-## Why you should use this
-
-Tired of doing room matches and the uma interface? have no fear cause this tool uhhhhhhhh.. .. . helps maybe on that front i guess. also large samples lowers variance or something i forget
-
-Since this is literally just comparing 2 different teams, I see 2 main ways that we can use this:
-- Do A/B tests on 2 different teams
-- Do A/B tests on 2 different skills (change skills on one of the umas and see how its WR increases/decreases)
+This is the main tool of the website. It allows you to import Umamusume and Teams to compare their relative strengths across a variety of opponents. 
 
 Why use this over Hakuraku/uma.moe race sims?
-- uhhhhhhhhhhh
-- everything runs locally so you can bump up simulations to the high moon (they only allow 100 sims per run, you need probably 1,000-10,000 sims to get anything consistent)
-- randomly selects teams from the CM population that are actual team comps, so you can measure your performance across the field instead of against 2 teams
+- everything runs locally, so you can choose how many simulations you want to run. I suggest 1,000 - 10,000 simulations to get relatively stable confidence intervals
+- randomly selects teams from the CM population that are actual team comps, so you can measure your performance across the field instead of against 2 specific teams
 
-## Things that i should probably put into the main website that i'm too lazy to right now
+## Skill Optimizer
 
-- You can directly upload a race file from horseACT in the team import.
-- not sure what else
+This is an experimental tool which relies on a genetic algorithm to find the best build possible. It's currently in a WIP state.
 
 ## Credits
 
-Hakuraku for vague styling inspos and some data
+Hakuraku for vague styling inspos and a lot of data
 
 Uma Tools / Umalator for editor design and data and icons
 
