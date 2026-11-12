@@ -194,7 +194,7 @@
     import {Course} from './globalsim/index.js';
     import {TEAM_SIZE, Tally, drawTrials, loadTeam, report, teamLabel} from './compare.js';
     import {createRaceControls} from './race-controls.js';
-    import {Roster, canonicalJson, hashOf} from './roster.js';
+    import {Roster, canonicalJson, hashOf, umaIdOf} from './roster.js';
     import {validateTeamMembers} from './team-rules.js';
     import {renderResults} from './results.js';
     import {ICONS, createTeamPicker, memberChipsHtml, teamDisplayName} from './team-picker.js';
@@ -222,7 +222,15 @@
         onChange: () => { lastRun = null; },
     });
 
-    const manifest = await (await fetch('./pools/index.json')).json();
+    let manifest = [];
+    let poolError = null; // shown instead of results when the pool list couldn't be loaded
+    try {
+        const response = await fetch('./pools/index.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        manifest = await response.json();
+    } catch (error) {
+        poolError = `Could not load the opponent pools (${error.message}). Reload the page to try again.`;
+    }
     for (const entry of manifest) $('pool').add(new Option(entry.label, entry.file));
     // Picking a pool selects its meeting; the race can still be changed afterwards.
     const syncPoolMeeting = () => {
@@ -249,9 +257,9 @@
     function status() {
         // Compare needs at least one team, and every box that has umas must have all 3.
         const tested = testedSlots();
-        runButton.disabled = running || !tested.length || !tested.every((slot) => isComplete(teams[slot]));
+        runButton.disabled = running || !$('pool').value || !tested.length || !tested.every((slot) => isComplete(teams[slot]));
         if (lastRun || running) return;
-        output.textContent = '';
+        output.textContent = poolError ?? '';
     }
 
     // ---- Team boxes ----
@@ -266,7 +274,6 @@
     const savedTeam = (entry) => (entry?.rosterId ? roster.team(entry.rosterId) : null);
     /** A team can be saved once all 3 umas are chosen. */
     const isComplete = (entry) => entry?.team.members.length === TEAM_SIZE && entry.team.members.every(Boolean);
-    /** Saved, but the umas in the box no longer match the saved version. */
     /** The umas in the box no longer match the saved team it's based on. */
     const umasChanged = (entry) => Boolean(savedTeam(entry)) && entry.currentId !== entry.rosterId;
     /** The box's name was edited and differs from its saved team's (names only change on save). */
@@ -365,12 +372,15 @@
      */
     async function membersChanged(entry) {
         entry.currentId = isComplete(entry)
-            ? await hashOf(await Promise.all(entry.team.members.map((member) => hashOf(member))))
+            ? await hashOf(await Promise.all(entry.team.members.map((member, k) => memberUmaId(entry, k))))
             : null;
         entry.team.id = entry.currentId ?? entry.rosterId;
         if (!savedTeam(entry) && entry.currentId && roster.team(entry.currentId)) entry.rosterId = entry.currentId;
         if (savedTeam(entry)) syncFromRoster(entry);
     }
+
+    /** The roster id of the uma in slot k of a box (its runner plus its nickname). */
+    const memberUmaId = (entry, k) => umaIdOf(entry.team.members[k], entry.team.memberNames?.[k] || null);
 
     const emptyEntry = () => ({
         name: null, rosterId: null, currentId: null,
@@ -443,28 +453,40 @@
         const entry = teams[slot];
         if (!isComplete(entry)) throw new Error(`A team needs ${TEAM_SIZE} umas before it can be saved`);
         const umaIds = [];
-        for (const member of entry.team.members) umaIds.push(await roster.addUma(member));
+        for (const [k, member] of entry.team.members.entries()) {
+            umaIds.push(await roster.addUma(member, {name: entry.team.memberNames?.[k] || null}));
+        }
         let id = await hashOf(umaIds);
         const base = savedTeam(entry);
         const renamed = nameChanged(entry);
-        if (asCopy) {
-            if (!roster.team(id)) { // otherwise these exact umas are already a saved team: use that
+        // The box is pointed at the new id before saving, so the roster's onChange re-render already
+        // sees the saved version; if saving fails, it goes back to the team it was based on.
+        const before = {rosterId: entry.rosterId, currentId: entry.currentId};
+        try {
+            if (asCopy) {
+                if (!roster.team(id)) { // otherwise these exact umas are already a saved team: use that
+                    entry.currentId = entry.rosterId = id;
+                    // A box that was given its own name keeps it; otherwise "<name> (copy)".
+                    const name = renamed ? entry.name : copyName(entry.name ?? teamDisplayName(base ?? {}));
+                    await roster.addTeam(umaIds, {name});
+                }
+            } else if (base) {
+                if (base.id !== id) {
+                    entry.currentId = id;
+                    entry.rosterId = id;
+                    id = await roster.updateTeam(base.id, umaIds);
+                }
+                if (renamed) roster.renameTeam(id, entry.name); // the box's new name goes in now
+            } else if (!roster.team(id)) {
+                const taken = new Set(roster.teams().map((team) => team.name).filter(Boolean));
                 entry.currentId = entry.rosterId = id;
-                // A box that was given its own name keeps it; otherwise "<name> (copy)".
-                const name = renamed ? entry.name : copyName(entry.name ?? teamDisplayName(base ?? {}));
-                await roster.addTeam(umaIds, {name});
+                await roster.addTeam(umaIds, {name: entry.name ?? randomTeamName(taken)});
             }
-        } else if (base) {
-            if (base.id !== id) {
-                entry.currentId = id;
-                entry.rosterId = id; // so the onChange re-render already sees the saved version
-                id = await roster.updateTeam(base.id, umaIds);
-            }
-            if (renamed) roster.renameTeam(id, entry.name); // the box's new name goes in now
-        } else if (!roster.team(id)) {
-            const taken = new Set(roster.teams().map((team) => team.name).filter(Boolean));
-            entry.currentId = entry.rosterId = id;
-            await roster.addTeam(umaIds, {name: entry.name ?? randomTeamName(taken)});
+        } catch (error) {
+            Object.assign(entry, before);
+            renderBox(slot);
+            status();
+            throw error;
         }
         entry.nameEdited = false;
         entry.rosterId = entry.currentId = entry.team.id = id;
@@ -523,31 +545,29 @@
         async onConfirm({slot, index, isNew, savedUmaId}, data, nickname, {asCopy = false} = {}) {
             if (!savedUmaId) validateTeamMembers((teams[slot]?.team.members ?? Array(TEAM_SIZE).fill(null))
                 .map((member, k) => k === index ? data : member));
-            if (!isNew && !asCopy) {
-                const old = savedUmaId ?? await hashOf(teams[slot].team.members[index]);
-                for (const entry of teams) {
-                    if (!entry) continue;
-                    const members = await Promise.all(entry.team.members.map(async (member) =>
-                        member && await hashOf(member) === old ? data : member));
-                    validateTeamMembers(members);
-                }
-            }
             if (isNew || asCopy) {
-                // A new uma, or "Save as copy": save it as its own uma and put it in this slot only;
-                // the original (and everything using it) is left alone.
-                const existed = Boolean(roster.uma(await hashOf(data)));
-                const id = await roster.addUma(data);
-                // Identical stats/skills are the same saved uma; don't rename that one from a copy.
-                if (!existed || isNew) roster.renameUma(id, nickname);
+                // A new uma, or "Save as copy": save it as its own uma (the nickname is part of an
+                // uma, so a new nickname makes a separate one) and put it in this slot only; the
+                // original (and everything using it) is left alone.
+                const id = await roster.addUma(data, {name: nickname});
                 if (!savedUmaId) await putUma(slot, index, id);
                 return;
             }
-            const oldId = savedUmaId ?? await hashOf(teams[slot].team.members[index]);
+            const oldId = savedUmaId ?? await memberUmaId(teams[slot], index);
+            // Which box slots hold the uma being edited (the edited slot itself always does).
+            const holdsOld = async (s, k) => Boolean(teams[s].team.members[k])
+                && ((s === slot && k === index) || await memberUmaId(teams[s], k) === oldId);
+            const held = await Promise.all(teams.map((entry, s) => entry
+                && Promise.all(entry.team.members.map((_, k) => holdsOld(s, k)))));
+            teams.forEach((entry, s) => {
+                if (entry) validateTeamMembers(entry.team.members.map((member, k) => (held[s][k] ? data : member)));
+            });
             // Saved teams holding the old uma get new ids when it's replaced; remember their
             // umas so each box can follow its saved team.
             const bases = teams.map((entry) => savedTeam(entry)?.members.slice() ?? null);
-            const newId = roster.uma(oldId) ? await roster.updateUma(oldId, data) : await roster.addUma(data);
-            roster.renameUma(newId, nickname);
+            const newId = roster.uma(oldId)
+                ? await roster.updateUma(oldId, data, {name: nickname})
+                : await roster.addUma(data, {name: nickname});
             for (const [s, entry] of teams.entries()) {
                 if (!entry) continue;
                 let changed = false;
@@ -555,8 +575,8 @@
                     entry.rosterId = await hashOf(bases[s].map((id) => (id === oldId ? newId : id)));
                     changed = true;
                 }
-                for (const [k, member] of entry.team.members.entries()) {
-                    if (!member || !((s === slot && k === index) || await hashOf(member) === oldId)) continue;
+                for (const k of entry.team.members.keys()) {
+                    if (!held[s][k]) continue;
                     entry.team.members[k] = structuredClone(data);
                     entry.team.memberNames ??= Array(TEAM_SIZE).fill(null);
                     entry.team.memberNames[k] = nickname;
@@ -760,7 +780,10 @@
         try {
             const race = currentRace();
             const slots = testedSlots(); // boxes with umas, in page order
-            const tested = slots.map((slot) => teams[slot].team);
+            // Copies of the teams and names as they are now: the boxes stay editable during the run
+            // (and edits change a box's team in place), but the results belong to what was raced.
+            const tested = slots.map((slot) => structuredClone(teams[slot].team));
+            const testedNames = slots.map((slot) => teams[slot].name ?? slotLabel(slot));
             tested.forEach((team) => validateTeamMembers(team.members));
             // Leave the tested teams out of the opponents, matched by id or by identical members.
             const testedIds = new Set(tested.map((team) => team.id));
@@ -786,7 +809,7 @@
 
             // courseDistance turns on the per-uma skill activation positions.
             const courseDistance = Course.get(race.courseId).distance;
-            const tallies = slots.map((slot) => new Tally(teams[slot].team, teams[slot].name ?? slotLabel(slot), {courseDistance}));
+            const tallies = tested.map((team, i) => new Tally(team, testedNames[i], {courseDistance}));
             for (const perTeam of results) perTeam.forEach((result, i) => tallies[i].add(result));
             lastRun = {race, n, poolSize: pool.length, tallies, labels: slots.map(slotLabel)};
             console.log(`${n} trials in ${((performance.now() - started) / 1000).toFixed(1)} s`);

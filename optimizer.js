@@ -407,8 +407,10 @@ output.addEventListener('click', async (event) => {
   } else {
     const url = URL.createObjectURL(new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' }));
     const link = Object.assign(document.createElement('a'), { href: url, download: `${memberInfo(json).name}-optimized.json` });
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000); // revoking at once can cancel the download
   }
 });
 
@@ -486,8 +488,15 @@ async function optimize(resume = false) {
     const sourceBuilds = resume ? [] : rawTeams.flatMap((team) => (team.members ?? [])
       .filter((member) => member.racingStyle === STYLE_NUMBER[runUma.strategy])
       .map((member) => (member.skills ?? []).map(([id]) => Number(id))));
-    const { teammates, skipped } = resume ? { teammates: resumeSession.teammates, skipped: 0 } : teammatesFromTeams(rawTeams, arch.styles[slot]);
+    let { teammates, skipped } = resume ? { teammates: resumeSession.teammates, skipped: 0 } : teammatesFromTeams(rawTeams, arch.styles[slot]);
     if (skipped) warnings.push(`${skipped} of ${rawTeams.length} hakuraku teams were unusable and skipped.`);
+    if (!resume) {
+      // A team can't field the same character twice: skip teams that already have this uma's.
+      const usable = teammates.filter((pair) => pair.every((member) => member.charaId !== runUma.charaId));
+      const duplicates = teammates.length - usable.length;
+      if (duplicates) warnings.push(`${duplicates} of ${rawTeams.length} hakuraku teams already had ${memberInfo(runUma).name} and were skipped.`);
+      teammates = usable;
+    }
     const poolTeams = resume ? resumeSession.poolTeams : await loadPool(poolEntry.file, { fetch: fetchImpl });
     checkStop();
     const ctx = {

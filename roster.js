@@ -1,12 +1,13 @@
 // Uma roster: a user's umas and teams, persisted in localStorage.
 //
-// Every uma is keyed by the SHA-256 of its runner JSON (canonicalised, so key order doesn't
-// matter). Adding the same uma twice is therefore a no-op, and editing an uma gives it a new
-// id; teams that used it are repointed automatically. A team is an ordered list of 3 uma ids
+// Every uma is keyed by the SHA-256 of its runner JSON and nickname (canonicalised, so key order
+// doesn't matter; see umaIdOf). Adding the same uma twice is therefore a no-op, the same runner
+// under another nickname is a separate uma, and editing or renaming an uma gives it a new id;
+// teams that used it are repointed automatically. A team is an ordered list of 3 uma ids
 // and is keyed the same way, by the hash of that list.
 //
 // Stored shape (one localStorage key):
-//   { version: 1,
+//   { version: 2,
 //     umas:  { [id]: { id, name, favorite, data, addedAt } },
 //     teams: { [id]: { id, name, favorite, members: [umaId, umaId, umaId], addedAt } } }
 //
@@ -25,7 +26,7 @@ import { validateTeamMembers } from './team-rules.js';
 
 export const STORAGE_KEY = 'umacompare:roster';
 export const TEAM_SIZE = 3;
-const VERSION = 1;
+const VERSION = 2;
 
 const emptyState = () => ({ version: VERSION, umas: {}, teams: {} });
 
@@ -45,6 +46,14 @@ export async function hashOf(value) {
   const bytes = new TextEncoder().encode(canonicalJson(value));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * An uma's id. The nickname is part of the uma: the same runner with a different nickname is a
+ * different uma. Umas without a nickname hash their runner JSON alone.
+ */
+export function umaIdOf(data, name = null) {
+  return name ? hashOf({ data, name }) : hashOf(data);
 }
 
 export class Roster {
@@ -87,14 +96,17 @@ export class Roster {
     return this.#state.umas[id] ?? null;
   }
 
-  /** Add an uma (runner JSON). Returns its id; if it already exists, only the name/favorite given are updated. */
+  /**
+   * Add an uma (runner JSON + nickname). Returns its id. The same runner and nickname again is the
+   * same uma (only `favorite`, if given, is updated); a different nickname makes a separate uma.
+   */
   async addUma(data, { name = null, favorite } = {}) {
     checkUmaData(data);
-    const id = await hashOf(data);
+    name ||= null;
+    const id = await umaIdOf(data, name);
     this.#commit((state) => {
       const existing = state.umas[id];
       if (existing) {
-        if (name != null) existing.name = name;
         if (favorite != null) existing.favorite = Boolean(favorite);
       } else {
         state.umas[id] = { id, name, favorite: Boolean(favorite), data: structuredClone(data), addedAt: Date.now() };
@@ -103,29 +115,33 @@ export class Roster {
     return id;
   }
 
-  /** Replace an uma's data. Returns the new id; teams that used the old id now use the new one. */
-  async updateUma(id, data) {
+  /**
+   * Replace an uma's data and/or nickname (`name` omitted = keep it). Returns the new id; teams
+   * that used the old id now use the new one.
+   */
+  async updateUma(id, data, { name } = {}) {
     checkUmaData(data);
-    this.#require('umas', id);
+    const current = this.#require('umas', id);
+    const nextName = (name === undefined ? current.name : name) || null;
     for (const team of this.teamsUsing(id)) {
       validateTeamMembers(team.members.map((m) => m === id ? data : this.#require('umas', m).data));
     }
-    const newId = await hashOf(data);
+    const newId = await umaIdOf(data, nextName);
     if (newId === id) return id;
     const remapped = await this.#remapTeams((members) => members.map((m) => (m === id ? newId : m)));
     this.#commit((state) => {
       const old = state.umas[id];
       delete state.umas[id];
-      state.umas[newId] ??= { ...old, id: newId, data: structuredClone(data) };
+      state.umas[newId] ??= { ...old, id: newId, name: nextName, data: structuredClone(data) };
       state.umas[newId].favorite = Boolean(state.umas[newId].favorite || old.favorite);
       state.teams = remapped;
     });
     return newId;
   }
 
+  /** Change an uma's nickname. The nickname is part of its id, so this returns the new id. */
   renameUma(id, name) {
-    this.#require('umas', id);
-    this.#commit((state) => { state.umas[id].name = name; });
+    return this.updateUma(id, this.#require('umas', id).data, { name });
   }
 
   setFavoriteUma(id, favorite = true) {
@@ -268,7 +284,7 @@ export class Roster {
     const idMap = new Map();
     for (const [oldId, uma] of Object.entries(backup.umas)) {
       checkUmaData(uma.data);
-      const id = await hashOf(uma.data);
+      const id = await umaIdOf(uma.data, uma.name || null);
       idMap.set(oldId, id);
       const existing = next.umas[id];
       if (existing) existing.favorite = Boolean(existing.favorite || uma.favorite);
@@ -310,7 +326,8 @@ export class Roster {
     }
     if (raw == null) return emptyState();
     try {
-      const state = JSON.parse(raw);
+      let state = JSON.parse(raw);
+      if (state?.version === 1 && state.umas && state.teams) state = this.#migrateV1(state, raw);
       if (state?.version !== VERSION || !state.umas || !state.teams) throw new Error('bad shape');
       return state;
     } catch {
@@ -318,6 +335,25 @@ export class Roster {
       try { this.#storage.setItem(`${this.#key}:corrupt:${Date.now()}`, raw); } catch { /* ignore */ }
       return emptyState();
     }
+  }
+
+  /**
+   * Version 1 ids were the hash of the runner alone; version 2 hashes the nickname too. Nicknamed
+   * umas (and the teams using them) are dropped rather than rehashed; unnamed umas keep their ids.
+   * The version 1 data is kept aside under `<key>:v1-backup`.
+   */
+  #migrateV1(state, raw) {
+    const dropped = new Set(Object.values(state.umas).filter((uma) => uma.name).map((uma) => uma.id));
+    const next = {
+      version: VERSION,
+      umas: Object.fromEntries(Object.entries(state.umas).filter(([id]) => !dropped.has(id))),
+      teams: Object.fromEntries(Object.entries(state.teams).filter(([, team]) => !team.members?.some((m) => dropped.has(m)))),
+    };
+    try {
+      this.#storage.setItem(`${this.#key}:v1-backup`, raw);
+      this.#storage.setItem(this.#key, JSON.stringify(next));
+    } catch { /* storage full or blocked: migrate again on the next load */ }
+    return next;
   }
 
   /** Apply `mutate` to a copy, save it, and only then make it current (a failed save changes nothing). */

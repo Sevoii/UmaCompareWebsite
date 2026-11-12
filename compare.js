@@ -379,10 +379,6 @@ function printCompact(out, name, tally, n) {
 }
 
 /**
- * The comparison report for finished tallies: one per tested team, any number of teams.
- * `labels` heads each team's section; it defaults to Team 1, Team 2, ...
- */
-/**
  * Win-rate difference between two tested teams (a - b) with its confidence interval:
  * { difference, low, high } as fractions. Every team races the same seeds, opponents and
  * gates, so the comparison is paired per trial.
@@ -395,6 +391,7 @@ export function winRateDifference(a, b) {
 /**
  * The comparison report: one section per tested team, then the win-rate difference of the
  * `pair` of teams ([i, j] indices into `tallies`; defaults to the first two, none for one team).
+ * `labels` heads each team's section; it defaults to Team 1, Team 2, ...
  */
 export function report({
   race, n, poolSize, tallies, labels = tallies.map((_, i) => `Team ${i + 1}`), compact,

@@ -24,10 +24,6 @@ export function loadManifest({ fetch: fetchImpl = globalThis.fetch } = {}) {
 }
 
 /**
- * The newest snapshot (by `meta.window`, then snapshotId) of Champions Meeting `meetingNumber`,
- * i.e. with cmId === 'cm' + n. null if there is none.
- */
-/**
  * The manifest's snapshots, newest first: by meeting number (cmId "cm22", "cm16-post", ...), then
  * by the date in `meta.window`. hakuraku's window strings mix formats ("2026-11-09", "20260919",
  * "CM16 post-balance collection"), so they are compared as their digits only, never as text.
@@ -42,6 +38,10 @@ export function snapshotsNewestFirst(manifest) {
     || String(b.snapshotId ?? '').localeCompare(String(a.snapshotId ?? '')));
 }
 
+/**
+ * The newest snapshot of Champions Meeting `meetingNumber` (cmId === 'cm' + n, ordered as in
+ * snapshotsNewestFirst), or null if there is none.
+ */
 export function snapshotForMeeting(manifest, meetingNumber) {
   return snapshotsNewestFirst(manifest).find((s) => s.cmId === `cm${meetingNumber}`) ?? null;
 }
